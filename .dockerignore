@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+!.env.example
+frontend/node_modules
+frontend/dist
+frontend/coverage
+frontend/*.tsbuildinfo
+backend/fpl-edge-api
+*.log
