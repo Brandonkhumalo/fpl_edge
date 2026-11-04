@@ -29,7 +29,7 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		Environment:     value("APP_ENV", "development"),
+		Environment:     environment(),
 		HTTPAddr:        httpAddress(),
 		StaticDir:       strings.TrimSpace(os.Getenv("STATIC_DIR")),
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
@@ -45,6 +45,15 @@ func Load() (Config, error) {
 		return Config{}, errors.New("JWT_SECRET must be at least 32 bytes")
 	}
 	return cfg, nil
+}
+
+func environment() string {
+	raw := strings.TrimSpace(os.Getenv("APP_ENV"))
+	raw = strings.Trim(raw, `"'`)
+	if raw == "" {
+		return "development"
+	}
+	return strings.ToLower(raw)
 }
 
 func httpAddress() string {

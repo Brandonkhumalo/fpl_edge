@@ -37,8 +37,9 @@ type Session struct {
 }
 
 type Season struct {
-	ID   uuid.UUID `json:"id"`
-	Name string    `json:"name"`
+	ID              uuid.UUID `json:"id"`
+	Name            string    `json:"name"`
+	CurrentGameweek int       `json:"currentGameweek"`
 }
 
 type CreateSquadInput struct {
@@ -66,11 +67,82 @@ func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
 func (s *Store) CurrentSeason(ctx context.Context) (Season, error) {
 	var season Season
-	err := s.pool.QueryRow(ctx, `SELECT id,name FROM seasons WHERE is_current`).Scan(&season.ID, &season.Name)
+	err := s.pool.QueryRow(ctx, `SELECT s.id,s.name,COALESCE((SELECT number FROM gameweeks WHERE season_id=s.id AND is_current LIMIT 1),1) FROM seasons s WHERE s.is_current`).Scan(&season.ID, &season.Name, &season.CurrentGameweek)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Season{}, ErrNotFound
 	}
 	return season, err
+}
+
+// SyncFootballData atomically refreshes the current season catalogue from the
+// provider. User squads continue to reference stable player UUIDs because all
+// provider entities are upserted by their provider identifiers.
+func (s *Store) SyncFootballData(ctx context.Context, data domain.FootballData) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err = tx.Exec(ctx, `UPDATE seasons SET is_current=false WHERE is_current`); err != nil {
+		return err
+	}
+	var seasonID uuid.UUID
+	rules := `{"squadSize":15,"budget":1000,"maxPlayersPerClub":3,"freeTransferCap":5,"transferHitPoints":4,"positions":{"GKP":2,"DEF":5,"MID":5,"FWD":3}}`
+	err = tx.QueryRow(ctx, `
+		INSERT INTO seasons(name,starts_on,ends_on,is_current,rules)
+		VALUES($1,$2,$3,true,$4)
+		ON CONFLICT (name) DO UPDATE SET starts_on=EXCLUDED.starts_on,ends_on=EXCLUDED.ends_on,is_current=true,rules=EXCLUDED.rules
+		RETURNING id`, data.SeasonName, data.StartsOn, data.EndsOn, rules).Scan(&seasonID)
+	if err != nil {
+		return err
+	}
+
+	clubIDs := make(map[int]uuid.UUID, len(data.Clubs))
+	for _, club := range data.Clubs {
+		var clubID uuid.UUID
+		err = tx.QueryRow(ctx, `
+			INSERT INTO clubs(season_id,provider_id,name,short_name) VALUES($1,$2,$3,$4)
+			ON CONFLICT (season_id,provider_id) DO UPDATE SET name=EXCLUDED.name,short_name=EXCLUDED.short_name
+			RETURNING id`, seasonID, club.ProviderID, club.Name, club.ShortName).Scan(&clubID)
+		if err != nil {
+			return err
+		}
+		clubIDs[club.ProviderID] = clubID
+	}
+
+	for _, player := range data.Players {
+		clubID, ok := clubIDs[player.ClubID]
+		if !ok {
+			return fmt.Errorf("player %d references unknown provider club %d", player.ProviderID, player.ClubID)
+		}
+		_, err = tx.Exec(ctx, `
+			INSERT INTO players(season_id,club_id,provider_id,first_name,last_name,position,price,status,total_points,form)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			ON CONFLICT (season_id,provider_id) DO UPDATE SET
+				club_id=EXCLUDED.club_id,first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,
+				position=EXCLUDED.position,price=EXCLUDED.price,status=EXCLUDED.status,
+				total_points=EXCLUDED.total_points,form=EXCLUDED.form,updated_at=now()`,
+			seasonID, clubID, player.ProviderID, player.FirstName, player.LastName, player.Position,
+			player.Price, player.Status, player.TotalPoints, player.Form)
+		if err != nil {
+			return err
+		}
+	}
+
+	if _, err = tx.Exec(ctx, `UPDATE gameweeks SET is_current=false WHERE season_id=$1`, seasonID); err != nil {
+		return err
+	}
+	for _, gameweek := range data.Gameweeks {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO gameweeks(season_id,number,deadline_at,is_current) VALUES($1,$2,$3,$4)
+			ON CONFLICT (season_id,number) DO UPDATE SET deadline_at=EXCLUDED.deadline_at,is_current=EXCLUDED.is_current`,
+			seasonID, gameweek.Number, gameweek.Deadline, gameweek.IsCurrent)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 // SeedDevelopmentData creates synthetic, clearly labelled data only for local development.

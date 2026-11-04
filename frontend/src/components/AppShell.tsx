@@ -1,13 +1,11 @@
-import { BarChart3, Bell, Bot, CalendarDays, LayoutDashboard, LogOut, Menu, Search, Settings, ShieldCheck, Sparkles, Users, X } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Users, X } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 const nav = [
-  ["Dashboard", "/dashboard", LayoutDashboard], ["My squad", "/my-squad", Users], ["Scout", "/scout", Search],
-  ["Fixtures", "/fixtures", CalendarDays], ["Predictions", "/predictions", Sparkles], ["Transfers", "/transfers", BarChart3],
-  ["Chip centre", "/chips", ShieldCheck], ["AI advisor", "/advisor", Bot], ["Notifications", "/notifications", Bell], ["Settings", "/settings", Settings]
+  ["Dashboard", "/dashboard", LayoutDashboard], ["My squad", "/my-squad", Users]
 ] as const;
 
 export function AppShell() {

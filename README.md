@@ -12,6 +12,7 @@ FPL Edge is a production-oriented Fantasy Premier League decision-support platfo
 - Selling-value, transfer-hit, baseline projection and starting-XI domain logic
 - Responsive React application with a polished landing page, email/password authentication, formation-aware squad onboarding and personalized squad dashboard
 - Synthetic player fixtures only when `APP_ENV=development`, visibly labelled in the UI
+- Current clubs, players, prices and gameweeks synchronized from the official FPL bootstrap feed in production
 - One multi-stage, non-root container serving both the Go API and React SPA
 
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for completed and remaining phases. Unfinished optimizer, chip, provider and AI surfaces are explicitly labelled and do not return fabricated results.
@@ -42,7 +43,7 @@ docker compose up --build
 - API readiness: `http://localhost:8080/health/ready`
 - PostgreSQL and Redis are internal to the Compose network.
 
-Migrations run transactionally at API startup. In development, the API seeds clearly named synthetic clubs and players so the onboarding workflow can be exercised. Production does not seed football data.
+Migrations run transactionally at API startup. In development, the API seeds clearly named synthetic clubs and players so the onboarding workflow can be exercised. In production, the API refreshes the current official FPL catalogue at startup and every six hours. A temporary provider failure does not crash the service or delete the last successful catalogue.
 
 ## Railway deployment
 
@@ -81,7 +82,7 @@ npm audit --omit=dev
 - Confirmed transfers update the FPL Edge internal ledger only. They do not execute an official FPL transfer.
 - Production requires HTTPS so refresh cookies receive the `Secure` flag.
 - Configure an explicit `CORS_ORIGINS` allowlist; credentials are never accepted from wildcard origins.
-- Football provider data must come from a licensed or otherwise authorized adapter. The public FPL API is undocumented and is not polled by this foundation.
+- The production catalogue currently uses FPL's official but undocumented bootstrap endpoint. Keep this integration isolated and replace it with a licensed provider if the product's scale or commercial terms require one.
 
 ## Price representation
 

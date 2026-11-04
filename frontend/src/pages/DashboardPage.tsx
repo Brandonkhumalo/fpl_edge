@@ -35,7 +35,7 @@ export function DashboardPage() {
   return <div className="mx-auto max-w-[1450px]">
     <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div><p className="text-sm font-semibold text-edge">Gameweek {data.currentGameweek} command centre</p><h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">Welcome back, {user?.displayName}</h1><p className="mt-2 text-sm text-slate-400">Your saved {formation} squad · Revision {data.revision}</p></div>
-      <div className="flex gap-3"><Link to="/onboarding" className="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/5">Rebuild squad</Link><Link to="/my-squad/edit" className="button-primary gap-2"><ArrowRightLeft size={17} /> Manage team</Link></div>
+      <div className="flex gap-3"><Link to="/onboarding" className="button-primary gap-2"><ArrowRightLeft size={17} /> Manage team</Link></div>
     </header>
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

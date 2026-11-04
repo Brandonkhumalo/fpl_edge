@@ -27,7 +27,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
     try {
       const session = await api<Session>(`/auth/${mode}`, { method: "POST", body: JSON.stringify(values) });
       setSession(session);
-      navigate(mode === "register" ? "/onboarding" : "/dashboard");
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Unable to continue");
     }

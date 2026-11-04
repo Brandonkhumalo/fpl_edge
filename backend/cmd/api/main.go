@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/tishanyq/fpl-edge/backend/internal/auth"
 	"github.com/tishanyq/fpl-edge/backend/internal/config"
+	"github.com/tishanyq/fpl-edge/backend/internal/football"
 	"github.com/tishanyq/fpl-edge/backend/internal/httpapi"
 	"github.com/tishanyq/fpl-edge/backend/internal/store"
 	"github.com/tishanyq/fpl-edge/backend/migrations"
@@ -50,6 +51,9 @@ func main() {
 			logger.Error("seed development football data", "error", err)
 			os.Exit(1)
 		}
+	} else {
+		syncFootballData(ctx, logger, dataStore)
+		go refreshFootballData(ctx, logger, dataStore)
 	}
 	authService := auth.New(cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
 	e := httpapi.New(cfg, dataStore, authService, logger)
@@ -66,4 +70,30 @@ func main() {
 	if err := e.Shutdown(shutdownCtx); err != nil {
 		logger.Error("graceful shutdown failed", "error", err)
 	}
+}
+
+func refreshFootballData(ctx context.Context, logger *slog.Logger, dataStore *store.Store) {
+	ticker := time.NewTicker(6 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			syncFootballData(ctx, logger, dataStore)
+		}
+	}
+}
+
+func syncFootballData(ctx context.Context, logger *slog.Logger, dataStore *store.Store) {
+	footballData, err := football.NewClient().Fetch(ctx)
+	if err != nil {
+		logger.Warn("football data sync skipped", "error", err)
+		return
+	}
+	if err = dataStore.SyncFootballData(ctx, footballData); err != nil {
+		logger.Warn("football data sync failed", "error", err)
+		return
+	}
+	logger.Info("football data synchronized", "season", footballData.SeasonName, "players", len(footballData.Players))
 }

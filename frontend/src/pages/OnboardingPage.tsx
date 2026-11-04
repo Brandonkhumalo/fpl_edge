@@ -14,7 +14,7 @@ export function OnboardingPage() {
   const [formation, setFormation] = useState<Formation>("4-4-2");
   const [selectionMessage, setSelectionMessage] = useState("");
 
-  const season = useQuery({ queryKey: ["current-season"], queryFn: () => api<{ id: string; name: string }>("/seasons/current") });
+  const season = useQuery({ queryKey: ["current-season"], queryFn: () => api<{ id: string; name: string; currentGameweek: number }>("/seasons/current") });
   const players = useQuery({
     queryKey: ["players", season.data?.id],
     queryFn: () => api<{ data: SquadPlayer[] }>(`/players?seasonId=${season.data!.id}`),
@@ -44,7 +44,7 @@ export function OnboardingPage() {
         method: "POST",
         body: JSON.stringify({
           seasonId: season.data!.id,
-          currentGameweek: 1,
+          currentGameweek: season.data!.currentGameweek,
           bank: 1000 - total,
           freeTransfers: 1,
           playerIds: selected.map((player) => player.playerId),

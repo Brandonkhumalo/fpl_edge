@@ -17,3 +17,10 @@ func TestHTTPAddressUsesRailwayPort(t *testing.T) {
 		t.Fatalf("got %q, want :7000", got)
 	}
 }
+
+func TestEnvironmentNormalizesQuotedProductionValue(t *testing.T) {
+	t.Setenv("APP_ENV", `"production"`)
+	if got := environment(); got != "production" {
+		t.Fatalf("got %q, want production", got)
+	}
+}
