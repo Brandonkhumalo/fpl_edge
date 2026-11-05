@@ -53,6 +53,7 @@ func New(cfg config.Config, dataStore *store.Store, authService *auth.Service, l
 	protected.GET("/squad/tactics", api.tactics)
 	protected.POST("/squad/captaincy", api.captaincy)
 	protected.POST("/squad/chip", api.chip)
+	protected.PUT("/squad/chip-history", api.chipHistory)
 	protected.GET("/settings", api.preferences)
 	protected.PUT("/settings", api.updatePreferences)
 	protected.GET("/squad/history", api.history)

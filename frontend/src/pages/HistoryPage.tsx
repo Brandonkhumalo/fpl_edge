@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
-const names:Record<string,string>={"squad.created":"Squad created","transfer.confirmed":"Transfer confirmed","lineup.substituted":"Substitution saved","captaincy.updated":"Captain & vice-captain changed","chip.updated":"Chip selection changed","gameweek.advanced":"Squad advanced to the next gameweek"};
+const names:Record<string,string>={"squad.created":"Squad created","transfer.confirmed":"Transfer confirmed","lineup.substituted":"Substitution saved","captaincy.updated":"Captain & vice-captain changed","chip.updated":"Chip selection changed","chip_history.updated":"Prior chip usage updated","gameweek.advanced":"Squad advanced to the next gameweek"};
 export function HistoryPage() {
  const history=useQuery({queryKey:["squad-history"],queryFn:()=>api<{type:string;revision:number;at:string}[]>("/squad/history")});
  return <div className="mx-auto max-w-3xl"><h1 className="text-3xl font-black">Team history</h1><p className="my-4 text-slate-400">Your latest 100 saved squad changes.</p>

@@ -3,15 +3,15 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 
-export const chipNames: Record<string,string> = { bboost: "Bench Boost", "3xc": "Triple Captain", freehit: "Free Hit", wildcard: "Wildcard" };
+import { ChipHistoryForm } from "../components/ChipHistoryForm";
+import { chipNames, type Chip, type Tactics } from "../lib/chips";
+export { chipNames, type Tactics } from "../lib/chips";
 const descriptions: Record<string,string> = {
  bboost: "Include all four bench players alongside your starting XI in this gameweek's scoring selection.",
  "3xc": "Set your captain's scoring multiplier to three for this gameweek.",
  freehit: "Make unlimited transfers without hits. Your original players, bank and captaincy return when the next gameweek opens.",
  wildcard: "Make unlimited transfers without hits. Your new squad stays in place after this gameweek."
 };
-type Chip = { id: number; name: string; startGameweek: number; endGameweek: number; usedGameweek: number | null };
-export type Tactics = { revision: number; gameweek: number; deadline: string | null; activeChip: string; chips: Chip[]; scoringMultipliers: Record<string,number> };
 
 export function ChipsPage() {
  const cache=useQueryClient();
@@ -32,15 +32,20 @@ export function ChipsPage() {
  return <div className="mx-auto max-w-5xl"><h1 className="text-3xl font-black">Chip centre</h1>
   <p className="mt-3 text-slate-400">Planning for Gameweek {data.gameweek}{data.deadline && ` · Deadline ${new Date(data.deadline).toLocaleString()}`}</p>
   <p className="my-4 text-sm text-slate-400">One chip per gameweek. Changes affect your FPL Edge team only; activate the same chip separately on the official FPL site. Live points scoring is not available yet.</p>
+  <p className="my-4 text-sm leading-6 text-slate-400">For 2026/27, all four chips have a first-half and second-half set. The second set starts in Gameweek 20; unused first-set chips expire after the Gameweek 19 deadline. Availability below follows your season's data. <a className="text-edge underline" href="https://www.premierleague.com/en/news/4679879/whats-happening-with-fpl-chips-in-202627" target="_blank" rel="noreferrer">Official FPL chip rules</a></p>
+  {data.chips.length > 0 && <details className="mb-5" open={!data.historyReviewed || undefined}>
+    <summary className="cursor-pointer font-semibold text-edge">{data.historyReviewed ? "Edit chips used before joining" : "Complete your chip history"}</summary>
+    <ChipHistoryForm key={data.revision} data={data} onSaved={() => setNotice("Prior chip usage saved. Remaining chips have been updated.")} />
+  </details>}
   {data.activeChip && <div className="card mb-5 border-edge/30 p-5"><strong className="text-edge">{chipNames[data.activeChip]} is active</strong><p className="mt-2 text-sm">{descriptions[data.activeChip]}</p><Link className="mt-3 inline-block text-edge" to="/my-squad">Manage this squad →</Link></div>}
   {notice && <p role="status" className="my-3 text-edge">{notice}</p>}
   {save.error && <p role="alert" className="my-3 text-red-300">{save.error.message}</p>}
   {!data.chips.length && <p className="card p-5">Chip availability is waiting for the current season's football data.</p>}
   <div className="grid gap-4 sm:grid-cols-2">{data.chips.map(chip => {
-   const active=chip.usedGameweek===data.gameweek;
-   const available=chip.usedGameweek===null && chip.startGameweek<=data.gameweek && chip.endGameweek>=data.gameweek && !data.activeChip && !closed;
+   const active=chip.usageSource==="fpl_edge" && chip.usedGameweek===data.gameweek;
+   const available=!chip.used && chip.startGameweek<=data.gameweek && chip.endGameweek>=data.gameweek && !data.activeChip && !closed;
    return <section key={chip.id} className="card p-5"><p className="text-xs text-edge">Gameweeks {chip.startGameweek}–{chip.endGameweek}</p><h2 className="my-2 text-xl font-bold">{chipNames[chip.name]}</h2><p className="min-h-20 text-sm leading-6 text-slate-400">{descriptions[chip.name]}</p>
-    <p className="my-3 text-sm">{active ? "Active this gameweek" : chip.usedGameweek ? `Used in Gameweek ${chip.usedGameweek}` : chip.endGameweek<data.gameweek ? "Expired" : chip.startGameweek>data.gameweek ? "Available later this season" : "Unused"}</p>
+    <p className="my-3 text-sm">{active ? "Active this gameweek" : chip.used ? (chip.usedGameweek ? `Used in Gameweek ${chip.usedGameweek}` : "Used · gameweek not recorded") : chip.endGameweek<data.gameweek ? "Expired unused" : chip.startGameweek>data.gameweek ? "Available later this season" : "Unused"}{chip.usageSource === "prior" && <span className="block text-xs text-slate-400">Recorded from before joining</span>}</p>
     <button className="button-primary" disabled={!available || save.isPending} onClick={() => {setConfirm(chip);save.reset();}}>Use {chipNames[chip.name]}</button>
     {active && ["bboost","3xc"].includes(chip.name) && <button className="mt-3 block text-sm text-slate-300" disabled={closed || save.isPending} onClick={() => save.mutate({chip,cancel:true})}>Cancel chip</button>}
    </section>;

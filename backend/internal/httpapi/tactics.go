@@ -52,3 +52,17 @@ func (a *API) chip(c echo.Context) error {
 	}
 	return a.tactics(c)
 }
+
+func (a *API) chipHistory(c echo.Context) error {
+	var request struct {
+		Revision int64                  `json:"expectedRevision"`
+		Usages   []store.PriorChipUsage `json:"usages"`
+	}
+	if err := c.Bind(&request); err != nil {
+		return badRequest("invalid chip history request")
+	}
+	if err := a.store.SetChipHistory(c.Request().Context(), userID(c), request.Revision, request.Usages); err != nil {
+		return tacticsResponse(err)
+	}
+	return a.tactics(c)
+}

@@ -102,7 +102,15 @@ can be cancelled before the deadline.
 
 The upcoming deadline determines the planning gameweek. Chip actions and team
 changes affect FPL Edge only and do not submit actions to the official FPL game.
-Existing official FPL chip usage is not imported automatically.
+Existing official FPL chip usage is not imported automatically. In Chip Centre,
+users can record chips used before joining separately for each availability window,
+with an optional gameweek. The dashboard prompts new squad owners to complete this
+history. Both copies of a chip can be marked used once both windows have started;
+future windows cannot be recorded as past usage. Imported history changes inventory
+only, and can be corrected without undoing in-app activations.
+
+The app is not yet a full personalized advisory system. See the evidence and
+remaining work in [docs/ADVISORY_STATUS.md](docs/ADVISORY_STATUS.md).
 
 Player Scout, Team History, and Settings are available in the sidebar. Saved
 strategy preferences do not yet drive an automated advisor. Live scoring,

@@ -89,6 +89,7 @@ export function OnboardingPage() {
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-edge/20 bg-edge/5 px-3 py-1.5 text-xs font-semibold text-edge"><Sparkles size={14} /> Your team, your decisions</div>
         <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Build your FPL squad</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Choose 15 players, pick a legal FPL formation, and preview your starting XI and bench before saving.</p>
+        <p className="mt-2 text-sm text-slate-400">Already playing FPL? After saving your squad, record the chips you used before joining in Chip Centre.</p>
       </div>
       <div className="min-w-[220px] rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <div className="flex items-center justify-between text-xs text-slate-400"><span>Squad progress</span><strong className="text-white">{selected.length}/15</strong></div>

@@ -16,6 +16,8 @@ var ErrTactics = errors.New("team change rejected")
 func tacticsError(message string) error { return fmt.Errorf("%w: %s", ErrTactics, message) }
 
 type ChipOption struct {
+	Used         bool   `json:"used"`
+	UsageSource  string `json:"usageSource"`
 	ID           int    `json:"id"`
 	Name         string `json:"name"`
 	Start        int    `json:"startGameweek"`
@@ -23,6 +25,7 @@ type ChipOption struct {
 	UsedGameweek *int   `json:"usedGameweek"`
 }
 type Tactics struct {
+	HistoryReviewed    bool              `json:"historyReviewed"`
 	ScoringMultipliers map[uuid.UUID]int `json:"scoringMultipliers"`
 	Revision           int64             `json:"revision"`
 	Gameweek           int               `json:"gameweek"`
@@ -34,7 +37,7 @@ type Tactics struct {
 func (s *Store) Tactics(ctx context.Context, userID uuid.UUID) (Tactics, error) {
 	var result Tactics
 	var squadID, seasonID uuid.UUID
-	err := s.pool.QueryRow(ctx, `SELECT id,season_id,revision,current_gameweek FROM user_squads WHERE user_id=$1 ORDER BY updated_at DESC,id DESC LIMIT 1`, userID).Scan(&squadID, &seasonID, &result.Revision, &result.Gameweek)
+	err := s.pool.QueryRow(ctx, `SELECT id,season_id,revision,current_gameweek,chip_history_reviewed FROM user_squads WHERE user_id=$1 ORDER BY updated_at DESC,id DESC LIMIT 1`, userID).Scan(&squadID, &seasonID, &result.Revision, &result.Gameweek, &result.HistoryReviewed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrNotFound
 	}
@@ -74,7 +77,13 @@ func (s *Store) Tactics(ctx context.Context, userID uuid.UUID) (Tactics, error) 
 	if err != nil {
 		return result, err
 	}
-	rows, err := s.pool.Query(ctx, `SELECT c.provider_id,c.name,c.start_gameweek,c.end_gameweek,u.gameweek FROM season_chips c LEFT JOIN squad_chips u ON u.squad_id=$2 AND u.provider_id=c.provider_id WHERE c.season_id=$1 ORDER BY c.start_gameweek,c.provider_id`, seasonID, squadID)
+	rows, err := s.pool.Query(ctx, `SELECT c.provider_id,c.name,c.start_gameweek,c.end_gameweek,COALESCE(u.gameweek,h.gameweek),
+		(u.provider_id IS NOT NULL OR h.provider_id IS NOT NULL),
+		CASE WHEN u.provider_id IS NOT NULL THEN 'fpl_edge' WHEN h.provider_id IS NOT NULL THEN 'prior' ELSE '' END
+		FROM season_chips c
+		LEFT JOIN squad_chips u ON u.squad_id=$2 AND u.provider_id=c.provider_id
+		LEFT JOIN prior_chip_usage h ON h.squad_id=$2 AND h.provider_id=c.provider_id
+		WHERE c.season_id=$1 ORDER BY c.start_gameweek,c.provider_id`, seasonID, squadID)
 	if err != nil {
 		return result, err
 	}
@@ -82,7 +91,7 @@ func (s *Store) Tactics(ctx context.Context, userID uuid.UUID) (Tactics, error) 
 	result.Chips = []ChipOption{}
 	for rows.Next() {
 		var chip ChipOption
-		if err = rows.Scan(&chip.ID, &chip.Name, &chip.Start, &chip.End, &chip.UsedGameweek); err != nil {
+		if err = rows.Scan(&chip.ID, &chip.Name, &chip.Start, &chip.End, &chip.UsedGameweek, &chip.Used, &chip.UsageSource); err != nil {
 			return result, err
 		}
 		result.Chips = append(result.Chips, chip)
@@ -247,6 +256,18 @@ func (s *Store) SetChip(ctx context.Context, userID uuid.UUID, revision int64, c
 			return tacticsError("chip is not active this gameweek")
 		}
 	} else {
+		var priorUsed bool
+		if err = tx.QueryRow(ctx, `SELECT EXISTS(
+			SELECT 1 FROM prior_chip_usage h JOIN season_chips c ON c.season_id=$2 AND c.provider_id=h.provider_id
+			WHERE h.squad_id=$1 AND (h.provider_id=$3 OR h.gameweek=$4 OR
+			($5='freehit' AND c.name='freehit' AND
+			(h.gameweek=$4-1 OR (h.gameweek IS NULL AND $4-1 BETWEEN c.start_gameweek AND c.end_gameweek)))))
+			`, id, season, chipID, gw, name).Scan(&priorUsed); err != nil {
+			return err
+		}
+		if priorUsed {
+			return tacticsError("chip was already used before joining, or prior Free Hit history may prevent consecutive use; check your recorded gameweek")
+		}
 		var used bool
 		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM squad_chips WHERE squad_id=$1 AND (provider_id=$2 OR gameweek=$3 OR (name='freehit' AND $4='freehit' AND gameweek=$3-1)))`, id, chipID, gw, name).Scan(&used); err != nil {
 			return err

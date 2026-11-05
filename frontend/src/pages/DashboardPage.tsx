@@ -40,7 +40,7 @@ export function DashboardPage() {
       <div className="flex gap-3"><Link to="/my-squad" className="button-primary gap-2"><ArrowRightLeft size={17} /> Manage team</Link></div>
     </header>
 
-    <Link className="card mb-5 block p-4 text-edge" to="/chips">{tactics.data?.activeChip ? `${chipNames[tactics.data.activeChip]} active for Gameweek ${tactics.data.gameweek}` : "Manage chips: Bench Boost, Triple Captain, Free Hit & Wildcard"} →</Link>
+    <Link className="card mb-5 block p-4 text-edge" to="/chips">{tactics.data?.activeChip ? `${chipNames[tactics.data.activeChip]} active for Gameweek ${tactics.data.gameweek}` : tactics.data && !tactics.data.historyReviewed ? "Already used chips this season? Complete your chip history" : "Manage chips: Bench Boost, Triple Captain, Free Hit & Wildcard"} →</Link>
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Formation" value={formation} icon={<Users />} />
       <Metric label="Projected points" value={projectedPoints > 0 ? projectedPoints.toFixed(1) : "Pending"} icon={<Sparkles />} />
@@ -57,8 +57,8 @@ export function DashboardPage() {
 
       <div className="space-y-4">
         <div className="card p-5"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-edge">Squad status</p><h3 className="mt-2 text-xl font-black">Ready for Gameweek {data.currentGameweek}</h3></div><span className="grid h-11 w-11 place-items-center rounded-xl bg-edge/10 text-edge"><Sparkles /></span></div><div className="mt-5 space-y-3 border-t border-white/10 pt-4 text-sm"><Detail label="Players" value="15 / 15" /><Detail label="Starting XI" value="11 players" /><Detail label="Bench" value="4 players" /><Detail label="Free transfers" value={String(data.freeTransfers)} /></div></div>
-        <Recommendation title="Captaincy" value={captain?.name ?? "Awaiting selection"} text="Captain and vice-captain are selected only from your saved starting XI." />
-        <Recommendation title="Transfer watch" value="No forced transfer" text="FPL Edge will recommend activity only when a legal move improves your expected outcome." />
+        <Recommendation title="Your captain" value={captain?.name ?? "Awaiting selection"} text="Your saved selection. Automated captaincy recommendations are not available yet." />
+        <Recommendation title="Transfer advice" value="Not available yet" text="You can manage transfers manually. Personalised transfer rankings and chip timing recommendations have not been implemented." />
         <div className="card border-amber-400/20 p-5"><div className="flex gap-3"><AlertTriangle className="shrink-0 text-amber-300" /><div><h3 className="font-bold">Live data boundary</h3><p className="mt-1 text-sm leading-6 text-slate-400">Availability and fixture advice is withheld when provider data is stale or unavailable. Statistics are never invented.</p></div></div></div>
       </div>
     </section>
