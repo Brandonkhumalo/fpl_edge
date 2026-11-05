@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, CalendarDays, Search, Sparkles, TrendingUp, Users } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Bookmark, CalendarDays, Search, Sparkles, TrendingUp, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { TeamShirt } from "../components/FootballPitch";
@@ -98,6 +98,8 @@ function SummaryCard({ icon, label, player, value }: { icon: ReactNode; label: s
 }
 
 function PlayerCard({ player, forecast, owned, hasSquad }: { player: SquadPlayer; forecast?: Prediction; owned: boolean; hasSquad: boolean }) {
+  const cache = useQueryClient();
+  const watch = useMutation({ mutationFn: () => api(`/watchlist/${player.playerId}`, { method: "POST" }), onSuccess: () => void cache.invalidateQueries({ queryKey: ["watchlist"] }) });
   const fixtures = forecast?.fixtures.slice(0, 5) ?? [];
   return <article className="card overflow-hidden p-5">
     <div className="flex items-start gap-4"><TeamShirt player={player} compact={false} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-lg font-black">{player.name}</h2>{owned && <span className="rounded-full bg-edge/10 px-2 py-0.5 text-[10px] font-bold text-edge">Owned</span>}{player.selectedByPercent != null && player.selectedByPercent <= differentialOwnershipLimit && <span className="rounded-full bg-violet-400/10 px-2 py-0.5 text-[10px] font-bold text-violet-300">Differential</span>}</div><p className="mt-1 text-xs text-slate-400">{player.clubFullName ?? player.clubName} · {player.position}{player.squadNumber ? ` · #${player.squadNumber}` : ""}</p></div></div>
@@ -106,7 +108,7 @@ function PlayerCard({ player, forecast, owned, hasSquad }: { player: SquadPlayer
       const fixture = fixtures[index];
       return fixture ? <div key={fixture.fixtureId} title={`${fixture.opponent} ${fixture.home ? "home" : "away"} · ${fixture.points.toFixed(1)} expected points`} className={`rounded-lg border p-2 text-center ${difficultyClass(fixture.difficulty)}`}><p className="truncate text-[10px] font-black">{fixture.opponent}</p><p className="mt-0.5 text-[9px] opacity-75">{fixture.home ? "H" : "A"} · GW{fixture.gameweek}</p><p className="mt-1 text-[9px] font-bold">{fixture.points.toFixed(1)}</p></div> : <div key={index} className="grid min-h-[58px] place-items-center rounded-lg border border-white/5 bg-white/[.02] text-[9px] text-slate-600">TBC</div>;
     })}</div></div>
-    <div className="mt-5 border-t border-white/10 pt-4">{owned ? <Link to="/my-squad" className="inline-flex items-center gap-2 text-sm font-bold text-edge">Manage owned player <ArrowRight size={15} /></Link> : hasSquad ? <Link to={`/transfers?target=${encodeURIComponent(player.playerId)}`} className="button-primary w-full gap-2">Target for transfer <ArrowRight size={16} /></Link> : <Link to="/onboarding" className="button-primary w-full gap-2">Build a squad <Users size={16} /></Link>}</div>
+    <div className="mt-5 flex gap-2 border-t border-white/10 pt-4"><button className="button-secondary px-3" disabled={watch.isPending||watch.isSuccess} onClick={()=>watch.mutate()} title="Add to watchlist"><Bookmark size={16}/>{watch.isSuccess?"Watching":"Watch"}</button>{owned ? <Link to="/my-squad" className="inline-flex flex-1 items-center justify-center gap-2 text-sm font-bold text-edge">Manage owned player <ArrowRight size={15} /></Link> : hasSquad ? <Link to={`/transfers?target=${encodeURIComponent(player.playerId)}`} className="button-primary flex-1 gap-2">Target for transfer <ArrowRight size={16} /></Link> : <Link to="/onboarding" className="button-primary flex-1 gap-2">Build a squad <Users size={16} /></Link>}</div>
   </article>;
 }
 

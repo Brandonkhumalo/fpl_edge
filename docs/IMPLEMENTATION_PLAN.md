@@ -35,15 +35,15 @@ For the current implementation audit and its limits, see [ADVISORY_STATUS.md](AD
 - [x] Provider-backed current-season player catalogue and scouting/filtering UI
 - [x] Provider-backed fixtures, per-player FDR and gameweek/fixture forecast UI
 - [x] Atomic stored provider snapshots with freshness and model-version provenance
-- [ ] Immutable prediction-result snapshots and outcome evaluation
+- [x] Immutable recommendation snapshots, user decisions and manual outcome evaluation
 - [x] Personalized captaincy and transfer recommendation APIs
 
 ## Phase 4 - Advanced optimization
 
-- [ ] Multi-period transfer beam search
+- [x] Bounded sequential multi-period transfer search with saved revision-aware scenarios
 - [x] Bounded legal Wildcard/Free Hit rebuild search and BB/TC expected-return timing
 - [ ] Global chip optimization with full-season opportunity cost
-- [ ] Immutable scenario simulations and comparison
+- [x] Immutable saved transfer scenarios with explicit assumptions and stale-state detection
 
 ## Phase 5 - Optional analytics service
 
@@ -54,7 +54,8 @@ For the current implementation audit and its limits, see [ADVISORY_STATUS.md](AD
 ## Phase 6 - Product hardening
 
 - [ ] AI advisor grounded only in engine outputs
-- [ ] Notifications, analytics, watchlists
+- [x] In-app deadline notifications, calendar reminders and player watchlists/change events
+- [ ] Email/web-push delivery adapters and product analytics
 - [ ] Full Vitest/RTL and Playwright workflow
 - [ ] Rate-limit storage, observability, backups and production deployment runbook
 

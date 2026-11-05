@@ -31,6 +31,121 @@ type RebuildAdvice struct {
 	NextWeekGain float64          `json:"nextWeekGain"`
 }
 
+type PlannedWeek struct {
+	Gameweek    int             `json:"gameweek"`
+	Decision    string          `json:"decision"`
+	Transfer    *TransferAdvice `json:"transfer,omitempty"`
+	ProjectedXI float64         `json:"projectedXI"`
+	FreeAfter   int             `json:"freeTransfersAfter"`
+	BankAfter   int             `json:"bankAfter"`
+}
+
+type TransferPlan struct {
+	Weeks            []PlannedWeek `json:"weeks"`
+	BaselinePoints   float64       `json:"baselinePoints"`
+	ProjectedPoints  float64       `json:"projectedPoints"`
+	ExpectedGain     float64       `json:"expectedGain"`
+	EffectiveHorizon int           `json:"effectiveHorizon"`
+}
+
+// PlanTransfers performs a bounded, sequential search across gameweeks. It
+// considers rolling or making one legal transfer each week, carries bank and
+// free transfers forward, and never claims to be a global optimizer.
+func PlanTransfers(squad Squad, forecast Forecast, horizon int, strategy string) (TransferPlan, error) {
+	result := TransferPlan{Weeks: []PlannedWeek{}}
+	end := forecast.Gameweek + horizon - 1
+	if end > forecast.HorizonEnd {
+		end = forecast.HorizonEnd
+	}
+	if end < forecast.Gameweek {
+		return result, errors.New("forecast has no planning horizon")
+	}
+	result.EffectiveHorizon = end - forecast.Gameweek + 1
+	players := append([]SquadPlayer(nil), squad.Players...)
+	bank, free := squad.Bank, squad.FreeTransfers
+	byID := forecast.ByID()
+	for gw := forecast.Gameweek; gw <= end; gw++ {
+		lineup, err := recommendLineup(squad.Players, byID, gw)
+		if err != nil {
+			return result, err
+		}
+		result.BaselinePoints += lineup.Points
+	}
+	minimumGain := 0.5
+	if strategy == "conservative" {
+		minimumGain = 1.5
+	} else if strategy == "aggressive" || strategy == "injury_response" {
+		minimumGain = 0
+	}
+	for gw := forecast.Gameweek; gw <= end; gw++ {
+		baseline, err := recommendLineup(players, byID, gw)
+		if err != nil {
+			return result, err
+		}
+		bestGain := minimumGain
+		bestIndex := -1
+		var bestPlayer SquadPlayer
+		bestBank := bank
+		owned, clubs := map[uuid.UUID]bool{}, map[uuid.UUID]int{}
+		for _, player := range players {
+			owned[player.PlayerID] = true
+			clubs[player.ClubID]++
+		}
+		for index, outgoing := range players {
+			outProjection, ok := byID[outgoing.PlayerID]
+			if !ok {
+				return result, errors.New("owned player is missing from forecast")
+			}
+			for _, incoming := range forecast.Players {
+				if owned[incoming.PlayerID] || incoming.Position != outgoing.Position || incoming.Status != "a" {
+					continue
+				}
+				remaining := bank + SellingPrice(outgoing.PurchasePrice, outgoing.CurrentPrice) - incoming.CurrentPrice
+				if remaining < 0 || (incoming.ClubID != outgoing.ClubID && clubs[incoming.ClubID] >= 3) {
+					continue
+				}
+				gain := 0.0
+				for week := gw; week <= end; week++ {
+					gain += incoming.Gameweeks[week] - outProjection.Gameweeks[week]
+				}
+				hit := TransferHit(free, 1, DefaultRules())
+				gain -= float64(hit)
+				if strategy == "injury_response" && outProjection.Status != "a" {
+					gain += 2
+				}
+				if gain > bestGain {
+					bestGain, bestIndex, bestPlayer, bestBank = gain, index, incoming.SquadPlayer, remaining
+				}
+			}
+		}
+		week := PlannedWeek{Gameweek: gw, Decision: "roll", ProjectedXI: baseline.Points, BankAfter: bank}
+		if bestIndex >= 0 {
+			out := players[bestIndex]
+			hit := TransferHit(free, 1, DefaultRules())
+			bestPlayer.PurchasePrice = bestPlayer.CurrentPrice
+			players[bestIndex] = bestPlayer
+			bank = bestBank
+			if free > 0 {
+				free--
+			}
+			lineup, e := recommendLineup(players, byID, gw)
+			if e != nil {
+				return result, e
+			}
+			move := TransferAdvice{OutID: out.PlayerID, InID: bestPlayer.PlayerID, NetGain: bestGain, NextWeekGain: lineup.Points - baseline.Points - float64(hit), Hit: hit, BankAfter: bank}
+			week.Decision, week.Transfer, week.ProjectedXI, week.BankAfter = "transfer", &move, lineup.Points-float64(hit), bank
+		}
+		if gw < end && free < DefaultRules().FreeTransferCap {
+			free++
+		}
+		week.FreeAfter = free
+		result.ProjectedPoints += week.ProjectedXI
+		result.Weeks = append(result.Weeks, week)
+	}
+	result.ExpectedGain = result.ProjectedPoints - result.BaselinePoints
+	return result, nil
+}
+
 // PlanRebuild is a bounded greedy search, not a global optimizer. Each step
 // preserves the budget and club/position constraints. It cannot discover every
 // downgrade-to-fund-an-upgrade combination, so gains are conservative examples.

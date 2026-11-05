@@ -28,3 +28,11 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (response.status === 204 ? undefined : response.json()) as Promise<T>;
 }
 
+export async function downloadAPI(path: string, filename: string) {
+  const token = useAuth.getState().accessToken;
+  const response = await fetch(`${baseURL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: "include" });
+  if (!response.ok) throw new Error(`Download failed (${response.status})`);
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a"); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
+}
+

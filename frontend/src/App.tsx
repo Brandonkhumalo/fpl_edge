@@ -12,6 +12,7 @@ import { ScoutPage } from "./pages/ScoutPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { AdvicePage } from "./pages/AdvicePage";
+import { DeadlinePage, PlannerPage, RecommendationsPage, WatchlistPage } from "./pages/RetentionPages";
 
 export function App() {
   return <Routes>
@@ -31,6 +32,10 @@ export function App() {
         <Route path="/transfers" element={<ManageTeamPage />} />
         <Route path="/chips/*" element={<ChipsPage />} />
         <Route path="/scout" element={<ScoutPage />} />
+        <Route path="/deadline" element={<DeadlinePage />} />
+        <Route path="/watchlist" element={<WatchlistPage />} />
+        <Route path="/recommendations" element={<RecommendationsPage />} />
+        <Route path="/planner" element={<PlannerPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/my-squad/history" element={<HistoryPage />} />
         <Route path="/transfers/history" element={<HistoryPage />} />

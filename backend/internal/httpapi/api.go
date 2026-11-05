@@ -60,6 +60,16 @@ func New(cfg config.Config, dataStore *store.Store, authService *auth.Service, l
 	protected.PUT("/settings", api.updatePreferences)
 	protected.GET("/squad/history", api.history)
 	protected.POST("/optimizer/lineup", api.optimizeLineup)
+	protected.GET("/deadline", api.deadline)
+	protected.GET("/deadline/calendar.ics", api.deadlineCalendar)
+	protected.GET("/watchlist", api.watchlist)
+	protected.POST("/watchlist/:playerId", api.addWatch)
+	protected.DELETE("/watchlist/:playerId", api.removeWatch)
+	protected.GET("/recommendations/history", api.recommendationHistory)
+	protected.PUT("/recommendations/:id/action", api.selectRecommendation)
+	protected.PUT("/recommendations/:id/outcome", api.setRecommendationOutcome)
+	protected.GET("/transfer-plans", api.transferPlans)
+	protected.POST("/transfer-plans", api.generateTransferPlan)
 	if cfg.StaticDir != "" {
 		e.GET("/*", spaHandler(cfg.StaticDir))
 	}

@@ -8,14 +8,19 @@ import (
 )
 
 type preferences struct {
-	DisplayName string `json:"displayName"`
-	Strategy    string `json:"strategy"`
-	Horizon     int    `json:"planningHorizon"`
+	DisplayName           string `json:"displayName"`
+	Strategy              string `json:"strategy"`
+	Horizon               int    `json:"planningHorizon"`
+	Timezone              string `json:"timezone"`
+	DeadlineReminderHours int    `json:"deadlineReminderHours"`
+	InAppAlerts           bool   `json:"inAppAlerts"`
+	EmailAlerts           bool   `json:"emailAlerts"`
+	WebPushAlerts         bool   `json:"webPushAlerts"`
 }
 
 func (a *API) preferences(c echo.Context) error {
 	var data preferences
-	err := a.store.Pool().QueryRow(c.Request().Context(), `SELECT u.display_name,COALESCE(p.strategy,'balanced'),COALESCE(p.planning_horizon,6) FROM users u LEFT JOIN user_preferences p ON p.user_id=u.id WHERE u.id=$1 AND u.deleted_at IS NULL`, userID(c)).Scan(&data.DisplayName, &data.Strategy, &data.Horizon)
+	err := a.store.Pool().QueryRow(c.Request().Context(), `SELECT u.display_name,COALESCE(p.strategy,'balanced'),COALESCE(p.planning_horizon,6),COALESCE(p.timezone,'UTC'),COALESCE(p.deadline_reminder_hours,24),COALESCE(p.in_app_alerts,true),COALESCE(p.email_alerts,false),COALESCE(p.web_push_alerts,false) FROM users u LEFT JOIN user_preferences p ON p.user_id=u.id WHERE u.id=$1 AND u.deleted_at IS NULL`, userID(c)).Scan(&data.DisplayName, &data.Strategy, &data.Horizon, &data.Timezone, &data.DeadlineReminderHours, &data.InAppAlerts, &data.EmailAlerts, &data.WebPushAlerts)
 	if err != nil {
 		return err
 	}
@@ -36,6 +41,13 @@ func (a *API) updatePreferences(c echo.Context) error {
 	if data.Horizon < 1 || data.Horizon > 8 {
 		return badRequest("planning horizon must be between 1 and 8")
 	}
+	data.Timezone = strings.TrimSpace(data.Timezone)
+	if _, err := time.LoadLocation(data.Timezone); err != nil {
+		return badRequest("timezone must be a valid IANA timezone")
+	}
+	if data.DeadlineReminderHours < 1 || data.DeadlineReminderHours > 168 {
+		return badRequest("deadline reminder must be between 1 and 168 hours")
+	}
 	ctx := c.Request().Context()
 	tx, err := a.store.Pool().Begin(ctx)
 	if err != nil {
@@ -45,7 +57,7 @@ func (a *API) updatePreferences(c echo.Context) error {
 	if _, err = tx.Exec(ctx, `UPDATE users SET display_name=$2,updated_at=now() WHERE id=$1`, userID(c), data.DisplayName); err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO user_preferences(user_id,strategy,planning_horizon) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET strategy=EXCLUDED.strategy,planning_horizon=EXCLUDED.planning_horizon,updated_at=now()`, userID(c), data.Strategy, data.Horizon); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO user_preferences(user_id,strategy,planning_horizon,timezone,deadline_reminder_hours,in_app_alerts,email_alerts,web_push_alerts) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(user_id) DO UPDATE SET strategy=EXCLUDED.strategy,planning_horizon=EXCLUDED.planning_horizon,timezone=EXCLUDED.timezone,deadline_reminder_hours=EXCLUDED.deadline_reminder_hours,in_app_alerts=EXCLUDED.in_app_alerts,email_alerts=EXCLUDED.email_alerts,web_push_alerts=EXCLUDED.web_push_alerts,updated_at=now()`, userID(c), data.Strategy, data.Horizon, data.Timezone, data.DeadlineReminderHours, data.InAppAlerts, data.EmailAlerts, data.WebPushAlerts); err != nil {
 		return err
 	}
 	if err = tx.Commit(ctx); err != nil {

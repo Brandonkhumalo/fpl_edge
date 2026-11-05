@@ -8,11 +8,11 @@ model, a guarantee of points, or an official FPL execution integration**.
 | --- | --- | --- |
 | Player forecasts | Every eligible catalogue player; fixture-level components and gameweek totals | Experimental estimates, no accuracy/backtest claim |
 | Captain / VC / XI | Legal formation, distinct owned starters, highest upcoming-GW expected points | Next-five totals break ties; no autosub or captain-fallback simulation |
-| Transfers | Top five independent one-player alternatives, hold threshold, same-calendar XI gain minus hits | No multi-period free-transfer strategy or combined ordinary-transfer plan |
+| Transfers | Top five immediate alternatives plus saved 3–8 Gameweek sequential plans that carry bank/free transfers | Multi-week search is bounded to roll-or-one-transfer weekly routes; price changes are not simulated and it is not a global optimum |
 | Bench Boost / Triple Captain | Extra expected points, best week within available forecast/window, use versus hold | Fixed conservative thresholds; no full-season chip scheduling |
 | Wildcard / Free Hit | Legal example rebuilds with budget, position and club constraints; estimated gains | Greedy search up to eight changed slots, not a global optimum; cannot discover all downgrade-funded combinations |
 | Prior chip use | Previously used sets, current windows, consecutive FH restrictions | Self-reported official history must be reviewed first |
-| Provenance | Atomic stored provider snapshot, fetched timestamp, model version, squad revision | Source retained as latest snapshot; immutable prediction-result history not yet implemented |
+| Provenance | Atomic provider source plus immutable per-revision recommendation snapshots, user decisions and manual/provider-labelled outcomes | Manual results are user supplied until an authorized finalized-score settlement source is integrated |
 
 ## Data and calendar
 
@@ -86,10 +86,10 @@ Free Hits. The app uses provider windows rather than hardcoded January dates.
 ## Remaining work
 
 Chronological backtesting/calibration, recent match-level minutes, measured
-uncertainty, full-season chip opportunity cost, multi-period transfer search,
-immutable prediction-result history, official squad reconciliation, notifications,
-live result scoring and optional LLM explanations. Saved strategy/horizon settings
-do not override this model's fixed five-fixture minimum.
+uncertainty, full-season chip opportunity cost, official squad reconciliation,
+automated finalized-result settlement, configured email/web-push delivery workers,
+live scoring and optional LLM explanations. Saved strategy/horizon settings feed
+the scenario planner but do not override the baseline model's fixture coverage rules.
 
 ## Local validation
 
@@ -98,7 +98,8 @@ do not override this model's fixed five-fixture minimum.
 - Domain tests: scoring components, blank/double weeks, unavailable players,
   legal zero-projection lineups, transfer hits/budget/club limits and rebuild horizon.
 - Provider test: statistics normalization and failure of either upstream source.
-- `go vet ./...`, frontend TypeScript/Vite build and 11 Vitest tests passed.
+- Frontend TypeScript/Vite build and 14 Vitest tests passed. The repository's lint
+  script is currently blocked because ESLint is not installed.
 - Production-mode local smoke with 670 official catalogue players: authenticated
   advice, five transfer alternatives and legal chip rebuild output. Approximately
   0.2 seconds for the test squad on this workstation; not a load-test guarantee.

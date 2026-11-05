@@ -113,6 +113,30 @@ func testAdviceDatabase(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	if advice.SquadRevision != squad.Revision || len(advice.Players) != 16 || advice.Lineup.Points <= 0 || len(advice.Owned) != 15 {
 		t.Fatal("incomplete personalized advice")
 	}
+	history, err := s.RecommendationHistory(ctx, user.ID)
+	if err != nil || len(history) != 1 || history[0].SquadRevision != squad.Revision {
+		t.Fatalf("immutable recommendation snapshot missing: %+v, %v", history, err)
+	}
+	if err = s.SetRecommendationOutcome(ctx, uuid.New(), history[0].ID, 42, ""); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("cross-user outcome update allowed: %v", err)
+	}
+	if err = s.SetRecommendationOutcome(ctx, user.ID, history[0].ID, 42, "final score"); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.AddWatch(ctx, user.ID, catalogue[0].PlayerID); err != nil {
+		t.Fatal(err)
+	}
+	watched, err := s.Watchlist(ctx, user.ID)
+	if err != nil || len(watched) != 1 {
+		t.Fatalf("watchlist not persisted: %+v, %v", watched, err)
+	}
+	if watchedOther, watchErr := s.Watchlist(ctx, uuid.New()); watchErr != nil || len(watchedOther) != 0 {
+		t.Fatalf("watchlist tenant isolation failed: %+v, %v", watchedOther, watchErr)
+	}
+	plan, err := s.GenerateTransferPlan(ctx, user.ID, "Test route", "balanced", 3)
+	if err != nil || len(plan.Plan.Weeks) == 0 || plan.SquadRevision != squad.Revision {
+		t.Fatalf("saved transfer plan missing: %+v, %v", plan, err)
+	}
 	for _, c := range advice.Chips {
 		if c.Decision != "unavailable" {
 			t.Fatal("unreviewed chip history ignored")

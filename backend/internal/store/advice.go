@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -95,6 +96,22 @@ func (s *Store) Advice(ctx context.Context, userID uuid.UUID) (Advice, error) {
 	}
 	if latest.ID != squad.ID || latest.Revision != squad.Revision {
 		return result, ErrRevisionConflict
+	}
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return result, err
+	}
+	confidence := "low"
+	for _, player := range result.Players {
+		if player.Confidence == "moderate" {
+			confidence = "moderate"
+			break
+		}
+	}
+	if _, err = s.pool.Exec(ctx, `INSERT INTO recommendation_snapshots(user_id,squad_id,gameweek,squad_revision,model_version,data_updated_at,expected_points,confidence,recommendation)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(squad_id,gameweek,squad_revision,model_version,data_updated_at) DO NOTHING`,
+		userID, squad.ID, result.Gameweek, result.SquadRevision, result.ModelVersion, result.DataUpdatedAt, result.SavedLineupPoints, confidence, payload); err != nil {
+		return result, err
 	}
 	return result, nil
 }
