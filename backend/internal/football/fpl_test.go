@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/tishanyq/fpl-edge/backend/internal/domain"
 )
 
 func TestFetchRequiresBothValidatedSources(t *testing.T) {
@@ -36,15 +38,15 @@ func TestFetchRequiresBothValidatedSources(t *testing.T) {
 func TestDecodeNormalizesBootstrapData(t *testing.T) {
 	payload := `{
 		"events":[{"id":1,"deadline_time":"2026-08-08T10:00:00Z","is_current":true},{"id":38,"deadline_time":"2027-05-23T15:00:00Z","is_current":false}],
-		"teams":[{"id":1,"name":"Arsenal","short_name":"ARS"}],
+		"teams":[{"id":1,"code":3,"name":"Arsenal","short_name":"ARS"}],
 		"element_types":[{"id":1,"singular_name_short":"GKP"},{"id":2,"singular_name_short":"DEF"},{"id":3,"singular_name_short":"MID"},{"id":4,"singular_name_short":"FWD"}],
-		"elements":[{"id":1,"first_name":"David","second_name":"Raya","team":1,"element_type":1,"now_cost":60,"status":"a","total_points":10,"form":"4.5"}]
+		"elements":[{"id":1,"web_name":"Raya","first_name":"David","second_name":"Raya Martin","team":1,"element_type":1,"now_cost":60,"status":"a","total_points":10,"form":"4.5"}]
 	}`
 	data, err := decode(strings.NewReader(payload))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if data.SeasonName != "2026/27" || len(data.Players) != 1 || data.Players[0].Price != 60 {
+	if data.SeasonName != "2026/27" || len(data.Players) != 1 || data.Players[0].Price != 60 || data.Clubs[0].KitCode != 3 {
 		t.Fatalf("unexpected normalized data: %+v", data)
 	}
 	if data.Players[0].SelectedByPercent != nil {
@@ -60,6 +62,28 @@ func TestDecodeNormalizesBootstrapData(t *testing.T) {
 		if err == nil {
 			t.Fatalf("accepted invalid ownership %q", invalid)
 		}
+	}
+}
+
+func TestEnrichSquadNumbersUsesOfficialClubList(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body><h5><a>Arsenal</a></h5><p>1 David Raya<br />7 Bukayo Saka</p></body></html>`))
+	}))
+	defer server.Close()
+	data := domain.FootballData{
+		SeasonName: "2026/27",
+		Clubs:      []domain.FootballClub{{ProviderID: 1, Name: "Arsenal"}},
+		Players: []domain.FootballPlayer{
+			{ClubID: 1, FirstName: "David", LastName: "Raya Martin", WebName: "Raya"},
+			{ClubID: 1, FirstName: "Bukayo", LastName: "Saka", WebName: "Saka"},
+		},
+	}
+	client := &Client{squadNumbersURL: server.URL, httpClient: server.Client()}
+	if err := client.enrichSquadNumbers(context.Background(), &data); err != nil {
+		t.Fatal(err)
+	}
+	if data.Players[0].SquadNumber == nil || *data.Players[0].SquadNumber != 1 || data.Players[1].SquadNumber == nil || *data.Players[1].SquadNumber != 7 {
+		t.Fatalf("shirt numbers were not matched: %+v", data.Players)
 	}
 }
 

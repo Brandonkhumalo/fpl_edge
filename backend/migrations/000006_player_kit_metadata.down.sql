@@ -1,0 +1,2 @@
+ALTER TABLE players DROP COLUMN IF EXISTS squad_number;
+ALTER TABLE clubs DROP COLUMN IF EXISTS kit_code;

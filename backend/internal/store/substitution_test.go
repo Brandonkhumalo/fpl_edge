@@ -41,6 +41,9 @@ func TestManageSquadPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(catalogue) == 0 || catalogue[0].TotalPoints <= 0 {
+		t.Fatal("catalogue did not expose current FPL points")
+	}
 	var players []domain.SquadPlayer
 	counts := map[domain.Position]int{}
 	clubs := map[uuid.UUID]int{}

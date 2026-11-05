@@ -29,6 +29,7 @@ type FootballGameweek struct {
 
 type FootballClub struct {
 	ProviderID int
+	KitCode    int
 	Name       string
 	ShortName  string
 }
@@ -38,6 +39,8 @@ type FootballPlayer struct {
 	SelectedByPercent *float64
 	ProviderID        int
 	ClubID            int
+	SquadNumber       *int
+	WebName           string
 	FirstName         string
 	LastName          string
 	Position          Position

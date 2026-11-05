@@ -23,6 +23,7 @@ Supply `Authorization: Bearer <access-token>`. Browser requests must also use cr
 - `GET /seasons/current`
 - `GET /players?seasonId=<uuid>&position=<position>&maxPrice=<integer>`
 - `GET /squad`
+- `GET /squad/prediction` — saved XI total using the selected captain and active Bench Boost or Triple Captain multiplier; independent of transfer recommendations
 - `POST /squad`
 - `POST /transfers/confirm` — requires `Idempotency-Key` and `expectedRevision`
 - `POST /optimizer/lineup`

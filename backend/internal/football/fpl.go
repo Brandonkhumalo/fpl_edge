@@ -16,19 +16,22 @@ import (
 )
 
 const (
-	defaultBootstrapURL = "https://fantasy.premierleague.com/api/bootstrap-static/"
-	maxResponseBytes    = 20 << 20
+	defaultBootstrapURL    = "https://fantasy.premierleague.com/api/bootstrap-static/"
+	defaultSquadNumbersURL = "https://www.premierleague.com/en/news/4725682/all-20-premier-league-clubs-squad-numbers-for-202627-season"
+	maxResponseBytes       = 20 << 20
 )
 
 type Client struct {
-	url        string
-	httpClient *http.Client
+	url             string
+	squadNumbersURL string
+	httpClient      *http.Client
 }
 
 func NewClient() *Client {
 	return &Client{
-		url:        defaultBootstrapURL,
-		httpClient: &http.Client{Timeout: 20 * time.Second},
+		url:             defaultBootstrapURL,
+		squadNumbersURL: defaultSquadNumbersURL,
+		httpClient:      &http.Client{Timeout: 20 * time.Second},
 	}
 }
 
@@ -57,6 +60,9 @@ func (c *Client) Fetch(ctx context.Context) (domain.FootballData, error) {
 	if err = domain.ValidateForecastData(data); err != nil {
 		return domain.FootballData{}, err
 	}
+	// Shirt numbers are display metadata from the official Premier League site.
+	// A metadata outage must not reject otherwise valid football/statistical data.
+	_ = c.enrichSquadNumbers(ctx, &data)
 	return data, nil
 }
 
@@ -87,6 +93,7 @@ type bootstrap struct {
 	} `json:"events"`
 	Teams []struct {
 		ID        int    `json:"id"`
+		Code      int    `json:"code"`
 		Name      string `json:"name"`
 		ShortName string `json:"short_name"`
 	} `json:"teams"`
@@ -97,7 +104,9 @@ type bootstrap struct {
 	Elements []struct {
 		domain.FootballStats
 		SelectedByPercent string `json:"selected_by_percent"`
+		SquadNumber       *int   `json:"squad_number"`
 		ID                int    `json:"id"`
+		WebName           string `json:"web_name"`
 		FirstName         string `json:"first_name"`
 		SecondName        string `json:"second_name"`
 		Team              int    `json:"team"`
@@ -145,7 +154,7 @@ func decode(reader io.Reader) (domain.FootballData, error) {
 		data.Gameweeks = append(data.Gameweeks, domain.FootballGameweek{ProviderID: event.ID, Number: event.ID, Deadline: event.DeadlineTime, IsCurrent: event.IsCurrent})
 	}
 	for _, team := range payload.Teams {
-		data.Clubs = append(data.Clubs, domain.FootballClub{ProviderID: team.ID, Name: team.Name, ShortName: team.ShortName})
+		data.Clubs = append(data.Clubs, domain.FootballClub{ProviderID: team.ID, KitCode: team.Code, Name: team.Name, ShortName: team.ShortName})
 	}
 	for _, player := range payload.Elements {
 		position, ok := positions[player.ElementType]
@@ -164,7 +173,7 @@ func decode(reader io.Reader) (domain.FootballData, error) {
 		data.Players = append(data.Players, domain.FootballPlayer{
 			FootballStats:     player.FootballStats,
 			SelectedByPercent: selectedByPercent,
-			ProviderID:        player.ID, ClubID: player.Team, FirstName: player.FirstName,
+			ProviderID:        player.ID, ClubID: player.Team, SquadNumber: player.SquadNumber, WebName: player.WebName, FirstName: player.FirstName,
 			LastName: player.SecondName, Position: position, Price: player.NowCost,
 			Status: player.Status, TotalPoints: player.TotalPoints, Form: form,
 		})

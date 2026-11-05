@@ -5,7 +5,10 @@ export type SquadPlayer = {
   clubId: string;
   clubName: string;
   clubFullName?: string;
+  kitCode?: number;
+  squadNumber?: number | null;
   selectedByPercent?: number | null;
+  totalPoints?: number;
   name: string;
   position: Position;
   currentPrice: number;

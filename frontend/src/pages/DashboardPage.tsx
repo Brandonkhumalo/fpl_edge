@@ -21,10 +21,27 @@ type Squad = {
   viceCaptainId: string;
 };
 
+type SquadPrediction = {
+  squadRevision: number;
+  gameweek: number;
+  points: number;
+  modelVersion: string;
+  activeChip: string;
+  generatedAt: string;
+  dataUpdatedAt: string;
+};
+
 export function DashboardPage() {
   const tactics = useQuery({ queryKey: ["tactics"], queryFn: () => api<Tactics>("/squad/tactics"), retry: false });
   const user = useAuth((state) => state.user);
   const squad = useQuery({ queryKey: ["squad"], queryFn: () => api<Squad>("/squad"), retry: false });
+  const prediction = useQuery({
+    queryKey: ["squad-prediction", squad.data?.revision],
+    queryFn: () => api<SquadPrediction>("/squad/prediction"),
+    enabled: squad.data?.revision !== undefined,
+    retry: false,
+    staleTime: 60_000
+  });
   const advice = useAdvice(squad.data?.revision);
   if (squad.isLoading) return <State icon={<LoaderCircle className="animate-spin" />} title="Loading your command centre" text="Fetching the latest saved squad revision." />;
   if (squad.isError) return <State icon={<Users />} title="Build your first squad" text="Select 15 players, choose an FPL formation, and save your starting XI and bench." action={<Link className="button-primary" to="/onboarding">Build my squad</Link>} />;
@@ -34,7 +51,7 @@ export function DashboardPage() {
   const bench = data.bench.map((id) => data.players.find((player) => player.playerId === id)).filter((player): player is SquadPlayer => Boolean(player));
   const captain = data.players.find((player) => player.playerId === data.captainId);
   const formation = inferFormation(data.players, data.starters);
-  const projectedPoints = advice.isError ? undefined : advice.data?.savedLineupPoints;
+  const projectedPoints = prediction.data?.points;
   const recommendedCaptain = advice.data?.players.find(p => p.playerId === advice.data?.lineup.captainId);
 
   return <div className="mx-auto max-w-[1450px]">
@@ -46,7 +63,7 @@ export function DashboardPage() {
     <Link className="card mb-5 block p-4 text-edge" to="/chips">{tactics.data?.activeChip ? `${chipNames[tactics.data.activeChip]} active for Gameweek ${tactics.data.gameweek}` : tactics.data && !tactics.data.historyReviewed ? "Already used chips this season? Complete your chip history" : "Manage chips: Bench Boost, Triple Captain, Free Hit & Wildcard"} →</Link>
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Formation" value={formation} icon={<Users />} />
-      <Metric label="Predicted points" value={projectedPoints !== undefined ? projectedPoints.toFixed(1) : "Unavailable"} icon={<Sparkles />} />
+      <Metric label="Predicted points" value={projectedPoints !== undefined ? projectedPoints.toFixed(1) : prediction.isLoading ? "Calculating…" : "Unavailable"} icon={<Sparkles />} detail={prediction.data ? `${prediction.data.activeChip ? `${chipNames[prediction.data.activeChip]} · ` : ""}Saved XI and captain included` : undefined} />
       <Metric label="Money in bank" value={`£${(data.bank / 10).toFixed(1)}m`} icon={<WalletCards />} />
       <Metric label="Captain" value={captain?.name ?? "Not set"} icon={<Crown />} />
     </section>
@@ -69,8 +86,8 @@ export function DashboardPage() {
   </div>;
 }
 
-function Metric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return <div className="card p-5"><div className="flex items-center justify-between text-slate-500"><p className="text-xs font-semibold uppercase tracking-wider">{label}</p><span className="text-edge">{icon}</span></div><p className="mt-4 truncate text-2xl font-black">{value}</p></div>;
+function Metric({ label, value, icon, detail }: { label: string; value: string; icon: ReactNode; detail?: string }) {
+  return <div className="card p-5"><div className="flex items-center justify-between text-slate-500"><p className="text-xs font-semibold uppercase tracking-wider">{label}</p><span className="text-edge">{icon}</span></div><p className="mt-4 truncate text-2xl font-black">{value}</p>{detail && <p className="mt-1 truncate text-[11px] text-slate-500">{detail}</p>}</div>;
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

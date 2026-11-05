@@ -115,9 +115,9 @@ func (s *Store) SyncFootballData(ctx context.Context, data domain.FootballData) 
 	for _, club := range data.Clubs {
 		var clubID uuid.UUID
 		err = tx.QueryRow(ctx, `
-			INSERT INTO clubs(season_id,provider_id,name,short_name) VALUES($1,$2,$3,$4)
-			ON CONFLICT (season_id,provider_id) DO UPDATE SET name=EXCLUDED.name,short_name=EXCLUDED.short_name
-			RETURNING id`, seasonID, club.ProviderID, club.Name, club.ShortName).Scan(&clubID)
+			INSERT INTO clubs(season_id,provider_id,kit_code,name,short_name) VALUES($1,$2,NULLIF($3,0),$4,$5)
+			ON CONFLICT (season_id,provider_id) DO UPDATE SET kit_code=EXCLUDED.kit_code,name=EXCLUDED.name,short_name=EXCLUDED.short_name
+			RETURNING id`, seasonID, club.ProviderID, club.KitCode, club.Name, club.ShortName).Scan(&clubID)
 		if err != nil {
 			return err
 		}
@@ -130,13 +130,13 @@ func (s *Store) SyncFootballData(ctx context.Context, data domain.FootballData) 
 			return fmt.Errorf("player %d references unknown provider club %d", player.ProviderID, player.ClubID)
 		}
 		_, err = tx.Exec(ctx, `
-			INSERT INTO players(season_id,club_id,provider_id,first_name,last_name,position,price,status,total_points,form,selected_by_percent)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			INSERT INTO players(season_id,club_id,provider_id,squad_number,first_name,last_name,position,price,status,total_points,form,selected_by_percent)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 			ON CONFLICT (season_id,provider_id) DO UPDATE SET
-				club_id=EXCLUDED.club_id,first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,
+				club_id=EXCLUDED.club_id,squad_number=EXCLUDED.squad_number,first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,
 				position=EXCLUDED.position,price=EXCLUDED.price,status=EXCLUDED.status,
 				total_points=EXCLUDED.total_points,form=EXCLUDED.form,selected_by_percent=EXCLUDED.selected_by_percent,updated_at=now()`,
-			seasonID, clubID, player.ProviderID, player.FirstName, player.LastName, player.Position,
+			seasonID, clubID, player.ProviderID, player.SquadNumber, player.FirstName, player.LastName, player.Position,
 			player.Price, player.Status, player.TotalPoints, player.Form, player.SelectedByPercent)
 		if err != nil {
 			return err
@@ -287,10 +287,11 @@ type CataloguePlayer struct {
 	domain.SquadPlayer
 	ClubFullName      string   `json:"clubFullName"`
 	SelectedByPercent *float64 `json:"selectedByPercent"`
+	TotalPoints       int      `json:"totalPoints"`
 }
 
 func (s *Store) ListPlayers(ctx context.Context, seasonID uuid.UUID, position string, maxPrice int) ([]CataloguePlayer, error) {
-	query := `SELECT p.id,p.club_id,c.short_name,p.first_name||' '||p.last_name,p.position,p.price,p.price,p.price,0,COALESCE(p.expected_minutes,0),c.name,p.selected_by_percent FROM players p JOIN clubs c ON c.id=p.club_id WHERE p.season_id=$1 AND ($2='' OR p.position=$2) AND ($3=0 OR p.price<=$3) ORDER BY p.total_points DESC,p.last_name,p.id`
+	query := `SELECT p.id,p.club_id,c.short_name,COALESCE(c.kit_code,0),p.squad_number,p.first_name||' '||p.last_name,p.position,p.price,p.price,p.price,0,COALESCE(p.expected_minutes,0),c.name,p.selected_by_percent,p.total_points FROM players p JOIN clubs c ON c.id=p.club_id WHERE p.season_id=$1 AND ($2='' OR p.position=$2) AND ($3=0 OR p.price<=$3) ORDER BY p.total_points DESC,p.last_name,p.id`
 	rows, err := s.pool.Query(ctx, query, seasonID, position, maxPrice)
 	if err != nil {
 		return nil, err
@@ -299,7 +300,7 @@ func (s *Store) ListPlayers(ctx context.Context, seasonID uuid.UUID, position st
 	players := make([]CataloguePlayer, 0)
 	for rows.Next() {
 		var p CataloguePlayer
-		if err := rows.Scan(&p.PlayerID, &p.ClubID, &p.ClubName, &p.Name, &p.Position, &p.CurrentPrice, &p.PurchasePrice, &p.SellingPrice, &p.ExpectedPoints, &p.ExpectedMins, &p.ClubFullName, &p.SelectedByPercent); err != nil {
+		if err := rows.Scan(&p.PlayerID, &p.ClubID, &p.ClubName, &p.KitCode, &p.SquadNumber, &p.Name, &p.Position, &p.CurrentPrice, &p.PurchasePrice, &p.SellingPrice, &p.ExpectedPoints, &p.ExpectedMins, &p.ClubFullName, &p.SelectedByPercent, &p.TotalPoints); err != nil {
 			return nil, err
 		}
 		players = append(players, p)
@@ -308,7 +309,7 @@ func (s *Store) ListPlayers(ctx context.Context, seasonID uuid.UUID, position st
 }
 
 func (s *Store) PlayersByIDs(ctx context.Context, seasonID uuid.UUID, ids []uuid.UUID) ([]domain.SquadPlayer, error) {
-	rows, err := s.pool.Query(ctx, `SELECT p.id,p.club_id,c.short_name,p.first_name||' '||p.last_name,p.position,p.price,p.price,p.price,0,COALESCE(p.expected_minutes,0) FROM players p JOIN clubs c ON c.id=p.club_id WHERE p.season_id=$1 AND p.id=ANY($2)`, seasonID, ids)
+	rows, err := s.pool.Query(ctx, `SELECT p.id,p.club_id,c.short_name,COALESCE(c.kit_code,0),p.squad_number,p.first_name||' '||p.last_name,p.position,p.price,p.price,p.price,0,COALESCE(p.expected_minutes,0) FROM players p JOIN clubs c ON c.id=p.club_id WHERE p.season_id=$1 AND p.id=ANY($2)`, seasonID, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +317,7 @@ func (s *Store) PlayersByIDs(ctx context.Context, seasonID uuid.UUID, ids []uuid
 	players := make([]domain.SquadPlayer, 0, len(ids))
 	for rows.Next() {
 		var p domain.SquadPlayer
-		if err := rows.Scan(&p.PlayerID, &p.ClubID, &p.ClubName, &p.Name, &p.Position, &p.CurrentPrice, &p.PurchasePrice, &p.SellingPrice, &p.ExpectedPoints, &p.ExpectedMins); err != nil {
+		if err := rows.Scan(&p.PlayerID, &p.ClubID, &p.ClubName, &p.KitCode, &p.SquadNumber, &p.Name, &p.Position, &p.CurrentPrice, &p.PurchasePrice, &p.SellingPrice, &p.ExpectedPoints, &p.ExpectedMins); err != nil {
 			return nil, err
 		}
 		players = append(players, p)
@@ -384,7 +385,7 @@ func (s *Store) Squad(ctx context.Context, userID uuid.UUID) (domain.Squad, erro
 	if err != nil {
 		return domain.Squad{}, err
 	}
-	rows, err := s.pool.Query(ctx, `SELECT p.id,p.club_id,c.short_name,p.first_name||' '||p.last_name,p.position,p.price,sp.purchase_price,sp.selling_price,0,COALESCE(p.expected_minutes,0),sp.is_starter,sp.bench_order FROM squad_players sp JOIN players p ON p.id=sp.player_id JOIN clubs c ON c.id=p.club_id WHERE sp.squad_id=$1 ORDER BY sp.is_starter DESC,sp.bench_order NULLS FIRST`, squad.ID)
+	rows, err := s.pool.Query(ctx, `SELECT p.id,p.club_id,c.short_name,COALESCE(c.kit_code,0),p.squad_number,p.first_name||' '||p.last_name,p.position,p.price,sp.purchase_price,sp.selling_price,0,COALESCE(p.expected_minutes,0),sp.is_starter,sp.bench_order FROM squad_players sp JOIN players p ON p.id=sp.player_id JOIN clubs c ON c.id=p.club_id WHERE sp.squad_id=$1 ORDER BY sp.is_starter DESC,sp.bench_order NULLS FIRST`, squad.ID)
 	if err != nil {
 		return domain.Squad{}, err
 	}
@@ -397,7 +398,7 @@ func (s *Store) Squad(ctx context.Context, userID uuid.UUID) (domain.Squad, erro
 	bench := make([]row, 0, 4)
 	for rows.Next() {
 		var r row
-		if err := rows.Scan(&r.p.PlayerID, &r.p.ClubID, &r.p.ClubName, &r.p.Name, &r.p.Position, &r.p.CurrentPrice, &r.p.PurchasePrice, &r.p.SellingPrice, &r.p.ExpectedPoints, &r.p.ExpectedMins, &r.starter, &r.order); err != nil {
+		if err := rows.Scan(&r.p.PlayerID, &r.p.ClubID, &r.p.ClubName, &r.p.KitCode, &r.p.SquadNumber, &r.p.Name, &r.p.Position, &r.p.CurrentPrice, &r.p.PurchasePrice, &r.p.SellingPrice, &r.p.ExpectedPoints, &r.p.ExpectedMins, &r.starter, &r.order); err != nil {
 			return domain.Squad{}, err
 		}
 		squad.Players = append(squad.Players, r.p)
@@ -458,7 +459,7 @@ func (s *Store) ConfirmTransfer(ctx context.Context, userID uuid.UUID, input Con
 		return domain.Squad{}, err
 	}
 	var incoming domain.SquadPlayer
-	err = tx.QueryRow(ctx, `SELECT p.id,p.club_id,c.short_name,p.first_name||' '||p.last_name,p.position,p.price,p.price,p.price,0,COALESCE(p.expected_minutes,0) FROM players p JOIN clubs c ON c.id=p.club_id WHERE p.id=$1 AND p.season_id=$2`, input.PlayerInID, seasonID).Scan(&incoming.PlayerID, &incoming.ClubID, &incoming.ClubName, &incoming.Name, &incoming.Position, &incoming.CurrentPrice, &incoming.PurchasePrice, &incoming.SellingPrice, &incoming.ExpectedPoints, &incoming.ExpectedMins)
+	err = tx.QueryRow(ctx, `SELECT p.id,p.club_id,c.short_name,COALESCE(c.kit_code,0),p.squad_number,p.first_name||' '||p.last_name,p.position,p.price,p.price,p.price,0,COALESCE(p.expected_minutes,0) FROM players p JOIN clubs c ON c.id=p.club_id WHERE p.id=$1 AND p.season_id=$2`, input.PlayerInID, seasonID).Scan(&incoming.PlayerID, &incoming.ClubID, &incoming.ClubName, &incoming.KitCode, &incoming.SquadNumber, &incoming.Name, &incoming.Position, &incoming.CurrentPrice, &incoming.PurchasePrice, &incoming.SellingPrice, &incoming.ExpectedPoints, &incoming.ExpectedMins)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Squad{}, errors.New("incoming player is not eligible")
 	}

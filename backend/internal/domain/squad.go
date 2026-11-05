@@ -38,6 +38,8 @@ type SquadPlayer struct {
 	PlayerID       uuid.UUID `json:"playerId"`
 	ClubID         uuid.UUID `json:"clubId"`
 	ClubName       string    `json:"clubName"`
+	KitCode        int       `json:"kitCode,omitempty"`
+	SquadNumber    *int      `json:"squadNumber"`
 	Name           string    `json:"name"`
 	Position       Position  `json:"position"`
 	CurrentPrice   int       `json:"currentPrice"`

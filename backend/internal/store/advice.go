@@ -2,12 +2,10 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/tishanyq/fpl-edge/backend/internal/domain"
 )
 
@@ -51,60 +49,15 @@ func (s *Store) Advice(ctx context.Context, userID uuid.UUID) (Advice, error) {
 	if tactics.Deadline == nil || !tactics.Deadline.After(time.Now()) {
 		return result, ErrAdviceUnavailable
 	}
-	// Source and identity map are read from one database snapshot. Source writes
-	// commit atomically with the player catalogue, never half a provider refresh.
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
-	if err != nil {
-		return result, err
-	}
-	defer tx.Rollback(ctx)
-	var raw []byte
-	err = tx.QueryRow(ctx, `SELECT payload,fetched_at FROM football_forecast_sources WHERE season_id=$1`, squad.SeasonID).Scan(&raw, &result.DataUpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return result, ErrAdviceUnavailable
-	}
-	if err != nil {
-		return result, err
-	}
-	if time.Since(result.DataUpdatedAt) > 24*time.Hour {
-		return result, ErrAdviceUnavailable
-	}
-	var source domain.FootballData
-	if err = json.Unmarshal(raw, &source); err != nil {
-		return result, err
-	}
-	rows, err := tx.Query(ctx, `SELECT p.provider_id,p.id,p.club_id,c.short_name,p.first_name||' '||p.last_name,p.position,p.price FROM players p JOIN clubs c ON c.id=p.club_id WHERE p.season_id=$1 ORDER BY p.provider_id`, squad.SeasonID)
-	if err != nil {
-		return result, err
-	}
-	ids := map[int]domain.SquadPlayer{}
-	for rows.Next() {
-		var id int
-		var p domain.SquadPlayer
-		if err = rows.Scan(&id, &p.PlayerID, &p.ClubID, &p.ClubName, &p.Name, &p.Position, &p.CurrentPrice); err != nil {
-			rows.Close()
-			return result, err
-		}
-		ids[id] = p
-	}
-	err = rows.Err()
-	rows.Close()
+	result.Forecast, result.DataUpdatedAt, result.GeneratedAt, err = s.forecastForSquad(ctx, squad)
 	if err != nil {
 		return result, err
 	}
 	var transferCount int
-	if err = tx.QueryRow(ctx, `SELECT count(*) FROM user_transfer_ledger WHERE squad_id=$1 AND gameweek=$2`, squad.ID, squad.CurrentGameweek).Scan(&transferCount); err != nil {
+	if err = s.pool.QueryRow(ctx, `SELECT count(*) FROM user_transfer_ledger WHERE squad_id=$1 AND gameweek=$2`, squad.ID, squad.CurrentGameweek).Scan(&transferCount); err != nil {
 		return result, err
 	}
-	if err = tx.Commit(ctx); err != nil {
-		return result, err
-	}
-	result.GeneratedAt = time.Now().UTC()
 	result.SquadRevision = squad.Revision
-	result.Forecast, err = domain.ForecastPlayers(source, ids, squad.CurrentGameweek, result.GeneratedAt)
-	if err != nil {
-		return result, ErrAdviceUnavailable
-	}
 	predictions := result.Forecast.ByID()
 	for i, p := range squad.Players {
 		predicted, ok := predictions[p.PlayerID]
@@ -113,7 +66,10 @@ func (s *Store) Advice(ctx context.Context, userID uuid.UUID) (Advice, error) {
 		}
 		squad.Players[i].CurrentPrice = predicted.CurrentPrice
 		result.Owned = append(result.Owned, p.PlayerID)
-		result.SavedLineupPoints += predicted.Gameweeks[squad.CurrentGameweek] * float64(tactics.ScoringMultipliers[p.PlayerID])
+	}
+	result.SavedLineupPoints, err = savedLineupPoints(squad.Players, result.Forecast, squad.CurrentGameweek, tactics.ScoringMultipliers)
+	if err != nil {
+		return result, err
 	}
 	result.Lineup, err = domain.RecommendLineup(squad.Players, result.Forecast, squad.CurrentGameweek)
 	if err != nil {

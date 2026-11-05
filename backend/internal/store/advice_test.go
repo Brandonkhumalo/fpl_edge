@@ -103,6 +103,13 @@ func testAdviceDatabase(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	prediction, err := s.Prediction(ctx, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prediction.SquadRevision != squad.Revision || prediction.Gameweek != squad.CurrentGameweek || prediction.Points != advice.SavedLineupPoints {
+		t.Fatalf("saved-team prediction diverged from advice: %+v versus %.2f", prediction, advice.SavedLineupPoints)
+	}
 	if advice.SquadRevision != squad.Revision || len(advice.Players) != 16 || advice.Lineup.Points <= 0 || len(advice.Owned) != 15 {
 		t.Fatal("incomplete personalized advice")
 	}

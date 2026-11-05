@@ -35,10 +35,23 @@ export function FootballPitch({ players, formation, captainId, viceCaptainId, co
 
 export function SquadPlayerCard({ player, badge, compact = false }: { player: SquadPlayer; badge?: string; compact?: boolean }) {
   return <div className={`relative min-w-0 rounded-xl border border-white/10 bg-[#07111f]/95 text-center shadow-lg ${compact ? "px-2 py-2" : "px-3 py-3"}`}>
-    <div className={`mx-auto grid place-items-center rounded-lg bg-gradient-to-br from-edge to-emerald-600 text-ink ${compact ? "h-7 w-7" : "h-9 w-9"}`}><Shirt size={compact ? 14 : 17} strokeWidth={2.5} /></div>
+    <TeamShirt player={player} compact={compact} />
     <p className={`mt-1.5 truncate font-bold ${compact ? "max-w-[72px] text-[10px] sm:max-w-[92px] sm:text-xs" : "text-xs sm:text-sm"}`}>{player.name}</p>
     <p className="mt-0.5 truncate text-[10px] font-medium text-slate-400">{player.clubName || player.position}</p>
     {badge && <span className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-amber-300 text-[10px] font-black text-ink shadow-lg">{badge}</span>}
+  </div>;
+}
+
+export function TeamShirt({ player, compact }: { player: SquadPlayer; compact: boolean }) {
+  const size = compact ? "h-9 w-9" : "h-12 w-12";
+  const goalkeeperSuffix = player.position === "GKP" ? "_1" : "";
+  const shirtUrl = player.kitCode
+    ? `https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_${player.kitCode}${goalkeeperSuffix}-66.png`
+    : "";
+  return <div className={`relative mx-auto grid place-items-center ${size}`} title={`${player.clubName} shirt${player.squadNumber ? ` · number ${player.squadNumber}` : ""}`}>
+    <div className="absolute inset-[12%] grid place-items-center rounded-lg bg-gradient-to-br from-edge to-emerald-600 text-ink"><Shirt size={compact ? 18 : 23} strokeWidth={2.5} /></div>
+    {shirtUrl && <img className="absolute inset-0 h-full w-full object-contain" src={shirtUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.hidden = true; }} />}
+    {player.squadNumber != null && <span className="relative z-10 mt-0.5 text-[10px] font-black text-white [text-shadow:0_1px_3px_#000,0_0_2px_#000]">{player.squadNumber}</span>}
   </div>;
 }
 

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { FootballPitch } from "../components/FootballPitch";
 import { CaptaincyControls } from "../components/CaptaincyControls";
 import { chipNames, type Tactics } from "./ChipsPage";
@@ -14,6 +14,8 @@ type Action = { kind: "transfer" | "substitute"; player: OwnedPlayer };
 
 export function ManageTeamPage() {
   const cache = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const targetId = searchParams.get("target") ?? "";
   const squad = useQuery({ queryKey: ["squad"], queryFn: () => api<Squad>("/squad"), retry: false });
   const tactics = useQuery({ queryKey: ["tactics"], queryFn: () => api<Tactics>("/squad/tactics"), retry: false });
   const [action, setAction] = useState<Action | null>(null);
@@ -25,7 +27,7 @@ export function ManageTeamPage() {
   const catalogue = useQuery({
     queryKey: ["players", squad.data?.seasonId],
     queryFn: () => api<{ data: SquadPlayer[] }>(`/players?seasonId=${squad.data!.seasonId}`),
-    enabled: action?.kind === "transfer" && Boolean(squad.data?.seasonId)
+    enabled: (action?.kind === "transfer" || Boolean(targetId)) && Boolean(squad.data?.seasonId)
   });
   const change = useMutation({
     mutationFn: () => {
@@ -45,9 +47,15 @@ export function ManageTeamPage() {
       void cache.invalidateQueries({ queryKey: ["tactics"] });
       setNotice(action?.kind === "transfer" ? "Transfer saved." : "Substitution saved.");
       setAction(null); setReplacement("");
+      if (targetId) setSearchParams({}, { replace: true });
     },
     onError: () => { void cache.invalidateQueries({ queryKey: ["squad"] }); }
   });
+  useEffect(() => {
+    if (action?.kind === "transfer" && targetId && catalogue.data?.data.some(player => player.playerId === targetId)) {
+      setReplacement(targetId);
+    }
+  }, [action?.kind, catalogue.data, targetId]);
   if (squad.isLoading) return <p>Loading your saved squad…</p>;
   if (!squad.data) return <div className="card p-6"><h1 className="text-2xl font-bold">Your squad</h1><p className="my-4">{squad.error?.message === "resource not found" ? "Build your first squad to start managing your team." : "Your squad could not be loaded. Please try again."}</p><button className="button-primary" onClick={() => void squad.refetch()}>Retry</button> <Link to="/onboarding" className="text-edge">Build squad</Link></div>;
   const data = squad.data;
@@ -68,14 +76,16 @@ export function ManageTeamPage() {
       return next.filter(p => p.position === "GKP").length === 1 && formations.some(f => f === formation);
     }) : [];
   const incoming = candidates.find(p => p.playerId === replacement);
+  const targetPlayer = catalogue.data?.data.find(player => player.playerId === targetId);
   const clubs = Array.from(new Map((catalogue.data?.data ?? []).map(p => [p.clubId, p.clubFullName ?? p.clubName])).entries()).sort((a,b) => a[1].localeCompare(b[1]));
   function begin(kind: Action["kind"], player: OwnedPlayer) {
-    setAction({ kind, player }); setReplacement(""); setSearch(""); setClub(""); setNotice(""); change.reset();
+    setAction({ kind, player }); setReplacement(kind === "transfer" && targetPlayer?.position === player.position ? targetId : ""); setSearch(""); setClub(""); setNotice(""); change.reset();
   }
   return <div className="mx-auto max-w-6xl">
     <h1 className="text-3xl font-black">Manage my team</h1>
     <p className="mt-3 text-slate-400">£{(data.bank / 10).toFixed(1)}m in bank · {data.freeTransfers} free transfers · {inferFormation(data.players, data.starters)}</p>
     <p className="mt-2 text-sm text-slate-400">Transfers replace an owned player. Substitutions swap your starting XI and bench for free. Changes apply to your FPL Edge team only.</p>
+    {targetPlayer && !data.players.some(player => player.playerId === targetPlayer.playerId) && <div className="card mt-5 border-edge/25 p-4"><p className="text-xs font-bold uppercase tracking-[.16em] text-edge">Scout target</p><p className="mt-2 font-bold">{targetPlayer.name} · {targetPlayer.position} · £{(targetPlayer.currentPrice / 10).toFixed(1)}m</p><p className="mt-1 text-sm text-slate-400">Choose Transfer on one of your {targetPlayer.position} players. Budget and club-limit eligibility will be checked before confirmation.</p></div>}
     {notice && <p role="status" className="my-4 text-edge">{notice}</p>}
     <div className="card my-5 p-4"><Link className="font-bold text-edge" to="/chips">{activeChip ? `${chipNames[activeChip]} active · Manage chips →` : "Use Bench Boost, Triple Captain, Free Hit or Wildcard →"}</Link>{activeChip === "3xc" && <p className="mt-2 text-sm">Captain multiplier: ×3</p>}{activeChip === "bboost" && <p className="mt-2 text-sm">All 15 players included in your scoring selection.</p>}</div>
     <CaptaincyControls key={data.revision} team={data} />
@@ -91,6 +101,7 @@ export function ManageTeamPage() {
       {action.kind === "transfer" && catalogue.isLoading ? <p className="my-3">Loading replacements…</p> : action.kind === "transfer" && catalogue.isError ? <p role="alert">Could not load replacements. <button onClick={() => void catalogue.refetch()}>Retry</button></p> : <label className="my-4 block">Choose replacement
         <select className="field mt-2" value={replacement} disabled={change.isPending} onChange={e => setReplacement(e.target.value)}><option value="">Select a player</option>{candidates.map(p => <option key={p.playerId} value={p.playerId}>{p.name} · {p.clubName} · {p.position} · £{(p.currentPrice / 10).toFixed(1)}m</option>)}</select>
         {!candidates.length && <span className="text-sm text-amber-200">No eligible players match these filters and squad rules.</span>}
+        {targetPlayer && action.kind === "transfer" && !candidates.some(player => player.playerId === targetPlayer.playerId) && <span className="mt-2 block text-sm text-amber-200">{targetPlayer.name} cannot replace this player under the current budget or three-per-club limit. Choose another outgoing {targetPlayer.position} player or another replacement.</span>}
       </label>}
       {incoming && <p className="my-3">{action.player.name} → {incoming.name}{action.kind === "transfer" && ` · Bank after: £${((data.bank + sale - incoming.currentPrice) / 10).toFixed(1)}m`}</p>}
       {change.error && <p role="alert" className="my-3 text-red-300">{change.error.message}</p>}
@@ -101,7 +112,7 @@ export function ManageTeamPage() {
       {(index === 0 ? data.starters : data.bench).map(id => { const player=data.players.find(p => p.playerId === id)!; return <div key={id} className="card p-4">
         <h3 className="font-bold">{player.name} {id === data.captainId ? "(C)" : id === data.viceCaptainId ? "(VC)" : ""}</h3>
         <p className="my-2 text-sm text-slate-400">{player.position} · {player.clubName} · £{(player.currentPrice / 10).toFixed(1)}m</p>
-        <button disabled={change.isPending} className="rounded-lg bg-edge/10 px-3 py-2 text-sm text-edge" onClick={() => begin("transfer",player)}>Transfer</button>
+        <button disabled={change.isPending || Boolean(targetPlayer && targetPlayer.position !== player.position)} className="rounded-lg bg-edge/10 px-3 py-2 text-sm text-edge disabled:cursor-not-allowed disabled:opacity-35" onClick={() => begin("transfer",player)}>Transfer{targetPlayer?.position === player.position ? ` for ${targetPlayer.name}` : ""}</button>
         <button disabled={change.isPending} className="ml-3 rounded-lg border border-white/10 px-3 py-2 text-sm" onClick={() => begin("substitute",player)}>Substitute</button>
       </div>; })}
     </div></section>)}

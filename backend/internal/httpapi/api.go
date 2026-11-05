@@ -47,6 +47,7 @@ func New(cfg config.Config, dataStore *store.Store, authService *auth.Service, l
 	protected.GET("/seasons/current", api.currentSeason)
 	protected.GET("/players", api.players)
 	protected.GET("/squad", api.getSquad)
+	protected.GET("/squad/prediction", api.prediction)
 	protected.GET("/advice", api.advice)
 	protected.POST("/squad", api.createSquad)
 	protected.POST("/transfers/confirm", api.confirmTransfer)
@@ -289,6 +290,15 @@ func (a *API) optimizeLineup(c echo.Context) error {
 
 func (a *API) advice(c echo.Context) error {
 	result, err := a.store.Advice(c.Request().Context(), userID(c))
+	if err != nil {
+		return adviceError(err)
+	}
+	c.Response().Header().Set("Cache-Control", "private, no-store")
+	return c.JSON(http.StatusOK, result)
+}
+
+func (a *API) prediction(c echo.Context) error {
+	result, err := a.store.Prediction(c.Request().Context(), userID(c))
 	if err != nil {
 		return adviceError(err)
 	}
