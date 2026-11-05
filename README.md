@@ -109,12 +109,18 @@ history. Both copies of a chip can be marked used once both windows have started
 future windows cannot be recorded as past usage. Imported history changes inventory
 only, and can be corrected without undoing in-app activations.
 
-The app is not yet a full personalized advisory system. See the evidence and
-remaining work in [docs/ADVISORY_STATUS.md](docs/ADVISORY_STATUS.md).
+Weekly Advisor now provides squad-specific XI, captain/VC, transfer and chip
+guidance, plus every player's fixture/gameweek predicted points. Production sync
+stores official FPL statistics and fixtures; advice requires a source less than
+24 hours old. The comparison horizon includes every club's next five scheduled
+fixtures, with blanks/doubles handled explicitly. Migration 000005 runs at startup;
+no additional Railway variables or Redis are required.
 
-Player Scout, Team History, and Settings are available in the sidebar. Saved
-strategy preferences do not yet drive an automated advisor. Live scoring,
-fixture analysis, predictions, and AI advice remain unfinished.
+Predictions are statistical estimates, not guaranteed points or a validated ML
+model. Rebuild searches are bounded and do not claim global optimality. See
+[docs/ADVISORY_STATUS.md](docs/ADVISORY_STATUS.md) for assumptions, thresholds and
+remaining work. No official FPL changes are submitted. Saved strategy/horizon
+preferences do not yet change the baseline model.
 
 ## Price representation
 

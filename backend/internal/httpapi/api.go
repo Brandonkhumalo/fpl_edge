@@ -47,6 +47,7 @@ func New(cfg config.Config, dataStore *store.Store, authService *auth.Service, l
 	protected.GET("/seasons/current", api.currentSeason)
 	protected.GET("/players", api.players)
 	protected.GET("/squad", api.getSquad)
+	protected.GET("/advice", api.advice)
 	protected.POST("/squad", api.createSquad)
 	protected.POST("/transfers/confirm", api.confirmTransfer)
 	protected.POST("/squad/substitute", api.substitute)
@@ -279,15 +280,29 @@ func (a *API) confirmTransfer(c echo.Context) error {
 }
 
 func (a *API) optimizeLineup(c echo.Context) error {
-	squad, err := a.store.Squad(c.Request().Context(), userID(c))
+	advice, err := a.store.Advice(c.Request().Context(), userID(c))
 	if err != nil {
-		return err
+		return adviceError(err)
 	}
-	starters, bench, captain, vice, err := domain.OptimizeLineup(squad.Players)
+	return c.JSON(http.StatusOK, map[string]any{"squadRevision": advice.SquadRevision, "starters": advice.Lineup.Starters, "bench": advice.Lineup.Bench, "captainId": advice.Lineup.CaptainID, "viceCaptainId": advice.Lineup.ViceCaptainID})
+}
+
+func (a *API) advice(c echo.Context) error {
+	result, err := a.store.Advice(c.Request().Context(), userID(c))
 	if err != nil {
-		return err
+		return adviceError(err)
 	}
-	return c.JSON(http.StatusOK, map[string]any{"squadRevision": squad.Revision, "starters": starters, "bench": bench, "captainId": captain, "viceCaptainId": vice})
+	c.Response().Header().Set("Cache-Control", "private, no-store")
+	return c.JSON(http.StatusOK, result)
+}
+func adviceError(err error) error {
+	if errors.Is(err, store.ErrAdviceUnavailable) {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, err.Error())
+	}
+	if errors.Is(err, store.ErrRevisionConflict) {
+		return echo.NewHTTPError(http.StatusConflict, "Your squad changed. Refresh the advice.")
+	}
+	return err
 }
 
 func (a *API) substitute(c echo.Context) error {

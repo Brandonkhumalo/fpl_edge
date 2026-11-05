@@ -155,6 +155,18 @@ func (s *Store) SyncFootballData(ctx context.Context, data domain.FootballData) 
 			return err
 		}
 	}
+	if len(data.Fixtures) > 0 {
+		if err = domain.ValidateForecastData(data); err != nil {
+			return err
+		}
+		payload, marshalErr := json.Marshal(data)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO football_forecast_sources(season_id,payload) VALUES($1,$2) ON CONFLICT(season_id) DO UPDATE SET payload=EXCLUDED.payload,fetched_at=now()`, seasonID, payload); err != nil {
+			return err
+		}
+	}
 	return tx.Commit(ctx)
 }
 

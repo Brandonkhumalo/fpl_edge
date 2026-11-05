@@ -13,7 +13,7 @@ For the current implementation audit and its limits, see [ADVISORY_STATUS.md](AD
 - [ ] Email delivery adapter for verification and password reset
 - [ ] Redis cache and durable background worker
 - [x] FPL bootstrap catalogue ingestion (players, clubs, prices, ownership, gameweeks and chip windows)
-- [ ] Fixture ingestion and prediction freshness/provenance pipeline
+- [x] Fixture ingestion and prediction freshness/provenance pipeline
 
 ## Phase 2 - Persistent squad management
 
@@ -33,13 +33,16 @@ For the current implementation audit and its limits, see [ADVISORY_STATUS.md](AD
 - [x] Explainable Go baseline projection formula
 - [x] Deterministic starting-XI optimizer
 - [x] Provider-backed current-season player catalogue and scouting/filtering UI
-- [ ] Provider-backed fixtures, FDR dashboard and stored prediction snapshots
-- [ ] Personalized captaincy and transfer recommendation APIs
+- [x] Provider-backed fixtures, per-player FDR and gameweek/fixture forecast UI
+- [x] Atomic stored provider snapshots with freshness and model-version provenance
+- [ ] Immutable prediction-result snapshots and outcome evaluation
+- [x] Personalized captaincy and transfer recommendation APIs
 
 ## Phase 4 - Advanced optimization
 
 - [ ] Multi-period transfer beam search
-- [ ] Wildcard, Free Hit, Triple Captain and Bench Boost optimizers
+- [x] Bounded legal Wildcard/Free Hit rebuild search and BB/TC expected-return timing
+- [ ] Global chip optimization with full-season opportunity cost
 - [ ] Immutable scenario simulations and comparison
 
 ## Phase 5 - Optional analytics service

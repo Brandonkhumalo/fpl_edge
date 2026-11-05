@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { FootballPitch, SquadPlayerCard } from "../components/FootballPitch";
 import { api } from "../lib/api";
+import { useAdvice } from "../lib/advice";
 import { useAuth } from "../lib/auth";
 import { inferFormation, type SquadPlayer } from "../lib/squad";
 import { chipNames, type Tactics } from "./ChipsPage";
@@ -24,6 +25,7 @@ export function DashboardPage() {
   const tactics = useQuery({ queryKey: ["tactics"], queryFn: () => api<Tactics>("/squad/tactics"), retry: false });
   const user = useAuth((state) => state.user);
   const squad = useQuery({ queryKey: ["squad"], queryFn: () => api<Squad>("/squad"), retry: false });
+  const advice = useAdvice(squad.data?.revision);
   if (squad.isLoading) return <State icon={<LoaderCircle className="animate-spin" />} title="Loading your command centre" text="Fetching the latest saved squad revision." />;
   if (squad.isError) return <State icon={<Users />} title="Build your first squad" text="Select 15 players, choose an FPL formation, and save your starting XI and bench." action={<Link className="button-primary" to="/onboarding">Build my squad</Link>} />;
 
@@ -32,7 +34,8 @@ export function DashboardPage() {
   const bench = data.bench.map((id) => data.players.find((player) => player.playerId === id)).filter((player): player is SquadPlayer => Boolean(player));
   const captain = data.players.find((player) => player.playerId === data.captainId);
   const formation = inferFormation(data.players, data.starters);
-  const projectedPoints = data.players.reduce((sum, player) => sum + (player.expectedPoints ?? 0) * (tactics.data?.scoringMultipliers[player.playerId] ?? (data.starters.includes(player.playerId) ? (player.playerId === data.captainId ? 2 : 1) : 0)), 0);
+  const projectedPoints = advice.isError ? undefined : advice.data?.savedLineupPoints;
+  const recommendedCaptain = advice.data?.players.find(p => p.playerId === advice.data?.lineup.captainId);
 
   return <div className="mx-auto max-w-[1450px]">
     <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -43,7 +46,7 @@ export function DashboardPage() {
     <Link className="card mb-5 block p-4 text-edge" to="/chips">{tactics.data?.activeChip ? `${chipNames[tactics.data.activeChip]} active for Gameweek ${tactics.data.gameweek}` : tactics.data && !tactics.data.historyReviewed ? "Already used chips this season? Complete your chip history" : "Manage chips: Bench Boost, Triple Captain, Free Hit & Wildcard"} →</Link>
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Formation" value={formation} icon={<Users />} />
-      <Metric label="Projected points" value={projectedPoints > 0 ? projectedPoints.toFixed(1) : "Pending"} icon={<Sparkles />} />
+      <Metric label="Predicted points" value={projectedPoints !== undefined ? projectedPoints.toFixed(1) : "Unavailable"} icon={<Sparkles />} />
       <Metric label="Money in bank" value={`£${(data.bank / 10).toFixed(1)}m`} icon={<WalletCards />} />
       <Metric label="Captain" value={captain?.name ?? "Not set"} icon={<Crown />} />
     </section>
@@ -57,8 +60,9 @@ export function DashboardPage() {
 
       <div className="space-y-4">
         <div className="card p-5"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-edge">Squad status</p><h3 className="mt-2 text-xl font-black">Ready for Gameweek {data.currentGameweek}</h3></div><span className="grid h-11 w-11 place-items-center rounded-xl bg-edge/10 text-edge"><Sparkles /></span></div><div className="mt-5 space-y-3 border-t border-white/10 pt-4 text-sm"><Detail label="Players" value="15 / 15" /><Detail label="Starting XI" value="11 players" /><Detail label="Bench" value="4 players" /><Detail label="Free transfers" value={String(data.freeTransfers)} /></div></div>
-        <Recommendation title="Your captain" value={captain?.name ?? "Awaiting selection"} text="Your saved selection. Automated captaincy recommendations are not available yet." />
-        <Recommendation title="Transfer advice" value="Not available yet" text="You can manage transfers manually. Personalised transfer rankings and chip timing recommendations have not been implemented." />
+        <Link to="/advice" className="button-primary w-full">Open your weekly advice →</Link>
+        <Recommendation title="Captain recommendation" value={!advice.isError && recommendedCaptain ? recommendedCaptain.name : "Awaiting fresh data"} text="Squad-specific forecasts consider minutes, scoring rules and upcoming fixtures. Review captain, VC, transfers and chips in your weekly advisor." />
+        <Recommendation title="Five-fixture outlook" value={advice.isError ? "Unavailable" : advice.data?.transfers.length ? "Transfer opportunities found" : advice.data ? "Hold or review your squad" : "Loading predictions"} text="Compare expected points per gameweek and inspect the scoring breakdown for every player. Predictions are estimates, not guaranteed points." />
         <div className="card border-amber-400/20 p-5"><div className="flex gap-3"><AlertTriangle className="shrink-0 text-amber-300" /><div><h3 className="font-bold">Live data boundary</h3><p className="mt-1 text-sm leading-6 text-slate-400">Availability and fixture advice is withheld when provider data is stale or unavailable. Statistics are never invented.</p></div></div></div>
       </div>
     </section>

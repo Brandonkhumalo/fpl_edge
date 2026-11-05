@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/tishanyq/fpl-edge/backend/internal/domain"
@@ -32,6 +33,34 @@ func NewClient() *Client {
 }
 
 func (c *Client) Fetch(ctx context.Context) (domain.FootballData, error) {
+	data, err := c.fetchBootstrap(ctx)
+	if err != nil {
+		return data, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(c.url, "bootstrap-static/")+"fixtures/", nil)
+	if err != nil {
+		return domain.FootballData{}, err
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("User-Agent", "FPL-Edge/1.0")
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return domain.FootballData{}, fmt.Errorf("fetch fixtures: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return domain.FootballData{}, fmt.Errorf("fixtures returned HTTP %d", response.StatusCode)
+	}
+	if err = json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(&data.Fixtures); err != nil {
+		return domain.FootballData{}, fmt.Errorf("decode fixtures: %w", err)
+	}
+	if err = domain.ValidateForecastData(data); err != nil {
+		return domain.FootballData{}, err
+	}
+	return data, nil
+}
+
+func (c *Client) fetchBootstrap(ctx context.Context) (domain.FootballData, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
 	if err != nil {
 		return domain.FootballData{}, err
@@ -66,6 +95,7 @@ type bootstrap struct {
 		ShortName domain.Position `json:"singular_name_short"`
 	} `json:"element_types"`
 	Elements []struct {
+		domain.FootballStats
 		SelectedByPercent string `json:"selected_by_percent"`
 		ID                int    `json:"id"`
 		FirstName         string `json:"first_name"`
@@ -132,6 +162,7 @@ func decode(reader io.Reader) (domain.FootballData, error) {
 			selectedByPercent = &value
 		}
 		data.Players = append(data.Players, domain.FootballPlayer{
+			FootballStats:     player.FootballStats,
 			SelectedByPercent: selectedByPercent,
 			ProviderID:        player.ID, ClubID: player.Team, FirstName: player.FirstName,
 			LastName: player.SecondName, Position: position, Price: player.NowCost,

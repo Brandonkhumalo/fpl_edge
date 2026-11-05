@@ -147,6 +147,20 @@ func OptimizeLineup(players []SquadPlayer) (starters, bench []uuid.UUID, captain
 	if len(players) != 15 {
 		return nil, nil, uuid.Nil, uuid.Nil, errors.New("optimizer requires a complete 15-player squad")
 	}
+	counts := map[Position]int{}
+	unique := map[uuid.UUID]bool{}
+	for _, p := range players {
+		if unique[p.PlayerID] {
+			return nil, nil, uuid.Nil, uuid.Nil, errors.New("duplicate optimizer player")
+		}
+		unique[p.PlayerID] = true
+		counts[p.Position]++
+	}
+	for position, count := range DefaultRules().PositionAllocation {
+		if counts[position] != count {
+			return nil, nil, uuid.Nil, uuid.Nil, errors.New("invalid optimizer squad composition")
+		}
+	}
 	sorted := append([]SquadPlayer(nil), players...)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		return adjustedPoints(sorted[i]) > adjustedPoints(sorted[j])
@@ -173,7 +187,7 @@ func OptimizeLineup(players []SquadPlayer) (starters, bench []uuid.UUID, captain
 		if len(selected) == 11 {
 			break
 		}
-		if _, exists := chosen[p.PlayerID]; !exists {
+		if _, exists := chosen[p.PlayerID]; !exists && p.Position != Goalkeeper {
 			selected = append(selected, p)
 			chosen[p.PlayerID] = struct{}{}
 		}
@@ -208,12 +222,6 @@ func contains(ids []uuid.UUID, wanted uuid.UUID) bool {
 }
 
 func adjustedPoints(player SquadPlayer) float64 {
-	availability := player.ExpectedMins / 90
-	if availability > 1 {
-		availability = 1
-	}
-	if availability < 0 {
-		availability = 0
-	}
-	return player.ExpectedPoints * availability
+	// Expected points already include minutes and availability probabilities.
+	return player.ExpectedPoints
 }

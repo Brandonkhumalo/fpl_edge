@@ -11,6 +11,7 @@ import { ChipsPage } from "./pages/ChipsPage";
 import { ScoutPage } from "./pages/ScoutPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HistoryPage } from "./pages/HistoryPage";
+import { AdvicePage } from "./pages/AdvicePage";
 
 export function App() {
   return <Routes>
@@ -23,6 +24,7 @@ export function App() {
     <Route element={<ProtectedRoute />}>
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/advice" element={<AdvicePage />} />
         <Route path="/my-squad" element={<ManageTeamPage />} />
         <Route path="/my-squad/edit" element={<ManageTeamPage />} />
         <Route path="/captaincy" element={<ManageTeamPage />} />

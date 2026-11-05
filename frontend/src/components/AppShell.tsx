@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
 const nav = [
-  ["Dashboard", "/dashboard", LayoutDashboard], ["My squad", "/my-squad", Users],
+  ["Dashboard", "/dashboard", LayoutDashboard], ["Weekly advisor", "/advice", Crown], ["My squad", "/my-squad", Users],
   ["Captain & VC", "/captaincy", Crown], ["Transfers", "/transfers", ArrowRightLeft], ["Chip centre", "/chips", ShieldCheck],
   ["Player scout", "/scout", Search], ["Team history", "/my-squad/history", History], ["Settings", "/settings", Settings]
 ] as const;

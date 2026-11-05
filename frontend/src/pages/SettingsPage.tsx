@@ -19,7 +19,7 @@ function SettingsForm({initial}:{initial:Preferences}) {
   <label className="block">Display name<input required minLength={2} maxLength={80} className="field mt-2" value={form.displayName} onChange={e=>setForm({...form,displayName:e.target.value})} /></label>
   <label className="block">Preferred strategy<select className="field mt-2" value={form.strategy} onChange={e=>setForm({...form,strategy:e.target.value})}>{["conservative","balanced","aggressive"].map(s=><option key={s}>{s}</option>)}</select></label>
   <label className="block">Planning horizon<select className="field mt-2" value={form.planningHorizon} onChange={e=>setForm({...form,planningHorizon:Number(e.target.value)})}>{Array.from({length:8},(_,i)=><option key={i+1} value={i+1}>{i+1} gameweeks</option>)}</select></label>
-  <p className="text-xs text-slate-400">Strategy and horizon are saved preferences. Automated advice is not available yet.</p>
+  <p className="text-xs text-slate-400">These are saved preferences for future planning modes. The weekly advisor currently uses a fixed minimum of five fixtures per club and a conservative baseline model, regardless of these settings.</p>
   {save.error && <p role="alert" className="text-red-300">{save.error.message}</p>}{save.isSuccess && <p role="status" className="text-edge">Settings saved.</p>}
   <button className="button-primary" disabled={save.isPending}>{save.isPending?"Saving…":"Save settings"}</button>
  </form>;
