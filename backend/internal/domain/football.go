@@ -70,15 +70,40 @@ type FootballStats struct {
 }
 
 type FootballFixture struct {
-	ID             int        `json:"id"`
-	Gameweek       *int       `json:"event"`
-	Home           int        `json:"team_h"`
-	Away           int        `json:"team_a"`
-	HomeScore      *int       `json:"team_h_score"`
-	AwayScore      *int       `json:"team_a_score"`
-	HomeDifficulty int        `json:"team_h_difficulty"`
-	AwayDifficulty int        `json:"team_a_difficulty"`
-	Kickoff        *time.Time `json:"kickoff_time"`
-	Finished       bool       `json:"finished"`
-	Started        bool       `json:"started"`
+	ID                  int        `json:"id"`
+	Gameweek            *int       `json:"event"`
+	Home                int        `json:"team_h"`
+	Away                int        `json:"team_a"`
+	HomeScore           *int       `json:"team_h_score"`
+	AwayScore           *int       `json:"team_a_score"`
+	HomeDifficulty      int        `json:"team_h_difficulty"`
+	AwayDifficulty      int        `json:"team_a_difficulty"`
+	Kickoff             *time.Time `json:"kickoff_time"`
+	Finished            bool       `json:"finished"`
+	FinishedProvisional bool       `json:"finished_provisional"`
+	Started             bool       `json:"started"`
+	Minutes             int        `json:"minutes"`
+}
+
+type LivePlayer struct {
+	ProviderID            int `json:"id"`
+	Minutes               int `json:"minutes"`
+	TotalPoints           int `json:"totalPoints"`
+	Bonus                 int `json:"bonus"`
+	BPS                   int `json:"bps"`
+	DefensiveContribution int `json:"defensiveContribution"`
+	Goals                 int `json:"goals"`
+	Assists               int `json:"assists"`
+	CleanSheets           int `json:"cleanSheets"`
+	GoalsConceded         int `json:"goalsConceded"`
+	Saves                 int `json:"saves"`
+	YellowCards           int `json:"yellowCards"`
+	RedCards              int `json:"redCards"`
+}
+
+type LiveGameweek struct {
+	Gameweek  int               `json:"gameweek"`
+	FetchedAt time.Time         `json:"fetchedAt"`
+	Players   []LivePlayer      `json:"players"`
+	Fixtures  []FootballFixture `json:"fixtures"`
 }

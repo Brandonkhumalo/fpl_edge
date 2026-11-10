@@ -82,7 +82,7 @@ export function ManageTeamPage() {
     setAction({ kind, player }); setReplacement(kind === "transfer" && targetPlayer?.position === player.position ? targetId : ""); setSearch(""); setClub(""); setNotice(""); change.reset();
   }
   return <div className="mx-auto max-w-6xl">
-    <h1 className="text-3xl font-black">Manage my team</h1>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-3xl font-black">Manage my team</h1><Link className="rounded-xl border border-edge/30 bg-edge/5 px-4 py-2 text-sm font-bold text-edge" to="/my-squad/import">Import / reconcile official squad</Link></div>
     <p className="mt-3 text-slate-400">£{(data.bank / 10).toFixed(1)}m in bank · {data.freeTransfers} free transfers · {inferFormation(data.players, data.starters)}</p>
     <p className="mt-2 text-sm text-slate-400">Transfers replace an owned player. Substitutions swap your starting XI and bench for free. Changes apply to your FPL Edge team only.</p>
     {targetPlayer && !data.players.some(player => player.playerId === targetPlayer.playerId) && <div className="card mt-5 border-edge/25 p-4"><p className="text-xs font-bold uppercase tracking-[.16em] text-edge">Scout target</p><p className="mt-2 font-bold">{targetPlayer.name} · {targetPlayer.position} · £{(targetPlayer.currentPrice / 10).toFixed(1)}m</p><p className="mt-1 text-sm text-slate-400">Choose Transfer on one of your {targetPlayer.position} players. Budget and club-limit eligibility will be checked before confirmation.</p></div>}

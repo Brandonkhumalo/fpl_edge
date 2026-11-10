@@ -2,6 +2,7 @@ package football
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -32,6 +33,31 @@ func TestFetchRequiresBothValidatedSources(t *testing.T) {
 	fixtureStatus = http.StatusServiceUnavailable
 	if _, err = client.Fetch(context.Background()); err == nil {
 		t.Fatal("partial provider refresh accepted")
+	}
+}
+
+func TestFetchLiveNormalizesPlayersAndFixtures(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/event/7/live/":
+			_, _ = w.Write([]byte(`{"elements":[{"id":11,"stats":{"minutes":64,"total_points":8,"bonus":2,"bps":31,"defensive_contribution":10,"goals_scored":1}}]}`))
+		case "/fixtures/":
+			if r.URL.Query().Get("event") != "7" {
+				t.Error("missing event filter")
+			}
+			_, _ = w.Write([]byte(`[{"id":70,"event":7,"team_h":1,"team_a":2,"started":true,"finished":false,"minutes":64,"team_h_difficulty":2,"team_a_difficulty":4}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client := &Client{url: server.URL + "/bootstrap-static/", httpClient: server.Client()}
+	data, err := client.FetchLive(context.Background(), 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data.Gameweek != 7 || len(data.Players) != 1 || data.Players[0].TotalPoints != 8 || data.Players[0].DefensiveContribution != 10 || len(data.Fixtures) != 1 || data.Fixtures[0].Minutes != 64 {
+		t.Fatalf("unexpected live data: %+v", data)
 	}
 }
 
@@ -90,5 +116,38 @@ func TestEnrichSquadNumbersUsesOfficialClubList(t *testing.T) {
 func TestDecodeRejectsIncompleteData(t *testing.T) {
 	if _, err := decode(strings.NewReader(`{"events":[],"teams":[],"elements":[]}`)); err == nil {
 		t.Fatal("expected incomplete payload error")
+	}
+}
+
+func TestFetchOfficialSquadUsesOnlyPublicEntryEndpoints(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/entry/42/":
+			_, _ = w.Write([]byte(`{"id":42,"current_event":3,"player_first_name":"Ada","player_last_name":"Lovelace","name":"Analytical XI"}`))
+		case "/entry/42/event/3/picks/":
+			_, _ = w.Write([]byte(`{"active_chip":"3xc","entry_history":{"event":3,"bank":15,"value":1012},"picks":[{"element":1,"position":1,"multiplier":1,"is_captain":false,"is_vice_captain":false},{"element":2,"position":2,"multiplier":1,"is_captain":true,"is_vice_captain":false},{"element":3,"position":3,"multiplier":1,"is_captain":false,"is_vice_captain":true},{"element":4,"position":4},{"element":5,"position":5},{"element":6,"position":6},{"element":7,"position":7},{"element":8,"position":8},{"element":9,"position":9},{"element":10,"position":10},{"element":11,"position":11},{"element":12,"position":12},{"element":13,"position":13},{"element":14,"position":14},{"element":15,"position":15}]}`))
+		case "/entry/42/history/":
+			_, _ = w.Write([]byte(`{"current":[{"event":1,"event_transfers":0},{"event":2,"event_transfers":0},{"event":3,"event_transfers":1}],"past":[{"season_name":"2025/26","total_points":2200,"rank":1000}],"chips":[{"name":"bboost","event":2}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client := &Client{url: server.URL + "/bootstrap-static/", httpClient: server.Client()}
+	result, err := client.FetchOfficialSquad(context.Background(), 42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ManagerName != "Ada Lovelace" || result.TeamName != "Analytical XI" || len(result.Picks) != 15 || result.Bank != 15 || result.FreeTransfers != 3 || !result.FreeTransfersEstimated || len(result.PastSeasons) != 1 {
+		t.Fatalf("unexpected official squad: %+v", result)
+	}
+}
+
+func TestFetchOfficialSquadMapsProviderFailures(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { http.NotFound(w, nil) }))
+	defer server.Close()
+	client := &Client{url: server.URL + "/bootstrap-static/", httpClient: server.Client()}
+	if _, err := client.FetchOfficialSquad(context.Background(), 999); !errors.Is(err, ErrManagerNotFound) {
+		t.Fatalf("expected manager-not-found error, got %v", err)
 	}
 }

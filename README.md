@@ -13,9 +13,12 @@ FPL Edge is a production-oriented Fantasy Premier League decision-support platfo
 - Responsive React application with a polished landing page, email/password authentication, formation-aware squad onboarding and personalized squad dashboard
 - Synthetic player fixtures only when `APP_ENV=development`, visibly labelled in the UI
 - Current clubs, players, prices and gameweeks synchronized from the official FPL bootstrap feed in production
+- Read-only public FPL squad import with an audited comparison preview before internal reconciliation
+- Provisional Live Gameweek snapshots with captain/chip multipliers, estimated automatic substitutions, bonus and defensive-contribution progress
+- A grounded advisor that cites immutable recommendation evidence; optional OpenAI ranking cannot generate factual answer text
 - One multi-stage, non-root container serving both the Go API and React SPA
 
-See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for completed and remaining phases. Unfinished optimizer, chip, provider and AI surfaces are explicitly labelled and do not return fabricated results.
+See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for completed and remaining phases. Unfinished optimizer, provider, delivery and analytics surfaces are explicitly labelled and do not return fabricated results.
 
 ## Local setup
 
@@ -62,7 +65,7 @@ Railway builds the root [Dockerfile](Dockerfile). It contains three stages: the 
 
 `VITE_API_URL` defaults to `/api/v1` during the image build, so no public API hostname is required and browser credentials remain same-origin. `STATIC_DIR=/app/public` is already set in the runtime image.
 
-`CORS_ORIGINS`, `ACCESS_TOKEN_TTL` and `REFRESH_TOKEN_TTL` are optional overrides. They are not needed for the standard same-origin Railway deployment.
+`CORS_ORIGINS`, `ACCESS_TOKEN_TTL` and `REFRESH_TOKEN_TTL` are optional overrides. `OPENAI_API_KEY` is optional; without it the grounded advisor uses deterministic evidence ranking. `OPENAI_MODEL` defaults to `gpt-6-astra`. They are not needed for the standard same-origin Railway deployment.
 
 ## Native validation
 
@@ -79,10 +82,11 @@ npm audit --omit=dev
 ## Security and data boundaries
 
 - Never provide an official FPL password or session cookie to this application.
+- Official squad import accepts only the numeric public manager/team ID and is rate-limited per FPL Edge user.
 - Confirmed transfers update the FPL Edge internal ledger only. They do not execute an official FPL transfer.
 - Production requires HTTPS so refresh cookies receive the `Secure` flag.
 - Configure an explicit `CORS_ORIGINS` allowlist; credentials are never accepted from wildcard origins.
-- The production catalogue currently uses FPL's official but undocumented bootstrap endpoint. Keep this integration isolated and replace it with a licensed provider if the product's scale or commercial terms require one.
+- The production catalogue and Live Gameweek sync currently use FPL's official but undocumented endpoints. Live snapshots are cached in PostgreSQL and refreshed under a database-wide lease to limit duplicate provider calls. Keep this integration isolated and replace it with a licensed provider if the product's scale or commercial terms require one.
 
 ## Team management and chips
 
@@ -102,12 +106,18 @@ can be cancelled before the deadline.
 
 The upcoming deadline determines the planning gameweek. Chip actions and team
 changes affect FPL Edge only and do not submit actions to the official FPL game.
-Existing official FPL chip usage is not imported automatically. In Chip Centre,
-users can record chips used before joining separately for each availability window,
-with an optional gameweek. The dashboard prompts new squad owners to complete this
-history. Both copies of a chip can be marked used once both windows have started;
+Users can import public official chip history through Import Official Squad, or
+record chips used before joining separately in Chip Centre for each availability
+window, with an optional gameweek. The dashboard prompts new squad owners to complete
+this history. Both copies of a chip can be marked used once both windows have started;
 future windows cannot be recorded as past usage. Imported history changes inventory
 only, and can be corrected without undoing in-app activations.
+
+The official public API does not expose exact saved free transfers or player purchase
+prices. Imports therefore label free transfers as a history-derived estimate and use
+current player prices for internal purchase/selling values. The comparison page shows
+this limitation before applying the imported squad. Official bank and team value are
+stored as reported by the provider.
 
 Weekly Advisor now provides squad-specific XI, captain/VC, transfer and chip
 guidance, plus every player's fixture/gameweek predicted points. Production sync

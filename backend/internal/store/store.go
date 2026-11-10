@@ -15,9 +15,11 @@ import (
 )
 
 var (
-	ErrNotFound         = errors.New("resource not found")
-	ErrConflict         = errors.New("resource already exists")
-	ErrRevisionConflict = errors.New("squad was updated in another session")
+	ErrNotFound                 = errors.New("resource not found")
+	ErrConflict                 = errors.New("resource already exists")
+	ErrRevisionConflict         = errors.New("squad was updated in another session")
+	ErrLiveUnavailable          = errors.New("live gameweek data is not available yet")
+	ErrLiveSelectionUnavailable = errors.New("the locked squad selection for this live gameweek is unavailable")
 )
 
 type Store struct{ pool *pgxpool.Pool }

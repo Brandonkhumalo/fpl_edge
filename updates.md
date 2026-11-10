@@ -1,6 +1,6 @@
 # FPL Edge product updates roadmap
 
-Updated: 5 November 2026
+Updated: 10 November 2026
 
 ## Product direction
 
@@ -14,23 +14,7 @@ All official FPL integration must remain read-only unless a separately reviewed 
 
 | Priority | Feature | Retention value | Estimated effort |
 | --- | --- | --- | --- |
-| 1 | Official squad import and reconciliation | Very high | Medium |
 | 6 | Mini-league and rival intelligence | High | High |
-| 7 | Live Gameweek experience | High | High |
-| 8 | Grounded AI explanations | Medium | Medium |
-
-## 1. Official squad import and reconciliation
-
-Allow users to enter their public FPL manager or team ID and import:
-
-- Current 15-player squad
-- Bank and team value
-- Free transfers
-- Captain and vice-captain
-- Active and previously used chips
-- Gameweek history
-
-Reconcile official state against FPL Edge after each Gameweek and clearly show differences before applying them internally. The integration must be read-only, rate-limited, auditable, and designed around provider terms and failure handling.
 
 ## 6. Mini-league and rival intelligence
 
@@ -47,38 +31,6 @@ Projected ranks and outcomes must be labelled as estimates.
 
 Official reference: [FPL leagues and cups guide](https://www.premierleague.com/en/news/2174934/fpl-basics-leagues-and-cups)
 
-## 7. Live Gameweek mode
-
-During matches, show:
-
-- Live squad points
-- Captain contribution
-- Bench points
-- Estimated bonus points
-- Defensive-contribution progress
-- Mini-league movement
-- Remaining players and fixtures
-- Final points after the official lock
-
-This requires an approved live-data source, caching, rate limiting, correction handling, and a clear distinction between provisional and final points.
-
-Official reference: [2026/27 FPL game updates](https://fantasy.premierleague.com/help/new)
-
-## 8. Grounded AI advisor
-
-Add AI explanations only after immutable recommendation snapshots and outcome measurement exist. The AI must explain engine outputs rather than invent recommendations or evidence.
-
-Supported questions could include:
-
-- Why is this captain recommended?
-- Why is this transfer worth a hit?
-- What changed since yesterday?
-- Compare these two players.
-- Build a conservative three-week plan.
-- What evidence would change this recommendation?
-
-Every numerical or factual claim must come from persisted engine output and carry fixture, model, and source provenance.
-
 ## Completed retention release
 
 Implemented on 5 November 2026:
@@ -89,14 +41,30 @@ Implemented on 5 November 2026:
 - Immutable recommendation snapshots, recorded user decisions and expected-versus-manually-recorded-actual review
 - Named three-to-eight-Gameweek transfer scenarios with bank/free-transfer carryover, explicit assumptions and stale-revision detection
 
-Email and web-push jobs remain disabled until delivery adapters and provider credentials are configured. Actual results remain explicitly manual until finalized provider settlement is integrated.
+Implemented on 6 November 2026:
+
+- Cached Live Gameweek snapshots with a database-wide provider sync lease, provisional/final labels, squad/captain/bench totals, estimated bonus, defensive progress, remaining fixtures and estimated automatic substitutions
+- Deadline-locked internal squad selections so next-Gameweek planning does not rewrite the prior Gameweek's live total
+- Grounded advisor answers assembled only from immutable recommendation, fixture, transfer, chip, player and bounded-plan evidence
+- Optional opt-in OpenAI Structured Outputs integration that ranks evidence IDs only; deterministic evidence ranking remains available without an API key
+- Audited advisor questions, evidence bundles, responses and per-user request limits
+
+Implemented on 10 November 2026:
+
+- Read-only public FPL manager/team ID connection without passwords or session cookies
+- Rate-limited and audited official squad previews containing all 15 players, bank, team value, captaincy, chip usage, and current/past Gameweek history
+- Explicit internal-versus-official reconciliation differences that require confirmation before atomically replacing the FPL Edge squad
+- Persisted official-team linkage for repeat post-Gameweek reconciliation, with stale preview and squad-revision protection
+- Transparent free-transfer estimation and current-price fallback because the public API does not expose exact free-transfer balances or player purchase prices
+
+Email and web-push jobs remain disabled until delivery adapters and provider credentials are configured. Actual results remain explicitly manual until finalized provider settlement is integrated. Mini-league movement remains unavailable until mini-league import is implemented under item 6; the Live page states this instead of estimating a rank.
 
 ## Required platform work
 
 The roadmap also depends on:
 
 - Email and web-push delivery adapters, worker retries and unsubscribe handling
-- Provider rate limiting and caching
+- Licensed live-data replacement, provider monitoring and correction reconciliation
 - Automated finalized-result settlement and richer outcome analytics
 - Analytics for activation, weekly retention, alert engagement, and recommendation adoption
 - Observability, backup, and recovery procedures

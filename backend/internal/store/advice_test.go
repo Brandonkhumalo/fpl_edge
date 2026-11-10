@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/tishanyq/fpl-edge/backend/internal/advisor"
 	"github.com/tishanyq/fpl-edge/backend/internal/domain"
 	"github.com/tishanyq/fpl-edge/backend/migrations"
 	"os"
@@ -195,6 +196,58 @@ func testAdviceDatabase(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	}
 	if !found {
 		t.Fatal("incoming player missing from recalculated advice")
+	}
+	liveRows, err := pool.Query(ctx, `SELECT p.provider_id FROM squad_players sp JOIN players p ON p.id=sp.player_id WHERE sp.squad_id=$1`, squad.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	livePlayers := []domain.LivePlayer{}
+	for liveRows.Next() {
+		var providerID int
+		if err = liveRows.Scan(&providerID); err != nil {
+			t.Fatal(err)
+		}
+		livePlayers = append(livePlayers, domain.LivePlayer{ProviderID: providerID, Minutes: 90, TotalPoints: 2, DefensiveContribution: 10})
+	}
+	if err = liveRows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	liveRows.Close()
+	liveFixtures := []domain.FootballFixture{}
+	for _, fixture := range data.Fixtures {
+		if fixture.Gameweek != nil && *fixture.Gameweek == 2 {
+			fixture.Started = true
+			liveFixtures = append(liveFixtures, fixture)
+		}
+	}
+	if err = s.SyncLiveData(ctx, domain.LiveGameweek{Gameweek: 2, FetchedAt: time.Now().UTC(), Players: livePlayers, Fixtures: liveFixtures}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = pool.Exec(ctx, `UPDATE gameweeks SET deadline_at=now()-interval '1 minute' WHERE season_id=$1 AND number=2`, season.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.PrepareSquad(ctx, user.ID); err != nil {
+		t.Fatal(err)
+	}
+	liveResult, err := s.LiveGameweek(ctx, user.ID)
+	if err != nil || liveResult.Gameweek != 2 || liveResult.Status != "provisional" || len(liveResult.Players) != 15 || liveResult.Points <= 0 {
+		t.Fatalf("locked live selection failed: %+v, %v", liveResult, err)
+	}
+	currentSquad, err := s.Squad(ctx, user.ID)
+	if err != nil || currentSquad.CurrentGameweek != 3 {
+		t.Fatalf("planning squad did not advance independently: %+v, %v", currentSquad, err)
+	}
+	grounding, err := s.AdvisorGrounding(ctx, user.ID, "Why is this captain recommended?")
+	if err != nil || len(grounding.Evidence) == 0 {
+		t.Fatalf("advisor grounding unavailable: %+v, %v", grounding, err)
+	}
+	selection := advisor.Selection{Kind: "explanation", EvidenceIDs: []string{"captain"}, Provider: "deterministic", Model: "test"}
+	if _, err = s.SaveAdvisorAnswer(ctx, uuid.New(), "Why?", grounding, selection); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("cross-user advisor write allowed: %v", err)
+	}
+	answer, err := s.SaveAdvisorAnswer(ctx, user.ID, "Why is this captain recommended?", grounding, selection)
+	if err != nil || len(answer.Evidence) != 1 || answer.ID == uuid.Nil {
+		t.Fatalf("advisor answer not audited: %+v, %v", answer, err)
 	}
 	if _, err = pool.Exec(ctx, `UPDATE football_forecast_sources SET fetched_at=now()-interval '25 hours' WHERE season_id=$1`, season.ID); err != nil {
 		t.Fatal(err)

@@ -13,6 +13,8 @@ model, a guarantee of points, or an official FPL execution integration**.
 | Wildcard / Free Hit | Legal example rebuilds with budget, position and club constraints; estimated gains | Greedy search up to eight changed slots, not a global optimum; cannot discover all downgrade-funded combinations |
 | Prior chip use | Previously used sets, current windows, consecutive FH restrictions | Self-reported official history must be reviewed first |
 | Provenance | Atomic provider source plus immutable per-revision recommendation snapshots, user decisions and manual/provider-labelled outcomes | Manual results are user supplied until an authorized finalized-score settlement source is integrated |
+| Live Gameweek | Cached provider snapshots, deadline-locked internal selection, captain/chip scoring, estimated autosubs, bonus/defensive progress and final-state label | Provider endpoints are undocumented; mini-league movement requires public-team/league import and corrections may change provisional totals |
+| Grounded advisor | Audited evidence bundles and citations; deterministic ranking by default, opt-in OpenAI structured evidence ranking | It explains existing engine output only and cannot invent or execute recommendations |
 
 ## Data and calendar
 
@@ -88,7 +90,8 @@ Free Hits. The app uses provider windows rather than hardcoded January dates.
 Chronological backtesting/calibration, recent match-level minutes, measured
 uncertainty, full-season chip opportunity cost, official squad reconciliation,
 automated finalized-result settlement, configured email/web-push delivery workers,
-live scoring and optional LLM explanations. Saved strategy/horizon settings feed
+mini-league movement until public-team import exists, licensed live-data replacement,
+and calibration. Saved strategy/horizon settings feed
 the scenario planner but do not override the baseline model's fixture coverage rules.
 
 ## Local validation

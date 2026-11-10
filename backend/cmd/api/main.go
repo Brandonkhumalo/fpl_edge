@@ -54,7 +54,9 @@ func main() {
 		}
 	} else {
 		syncFootballData(ctx, logger, dataStore)
+		syncLiveData(ctx, logger, dataStore)
 		go refreshFootballData(ctx, logger, dataStore)
+		go refreshLiveData(ctx, logger, dataStore)
 	}
 	authService := auth.New(cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
 	e := httpapi.New(cfg, dataStore, authService, logger)
@@ -71,6 +73,48 @@ func main() {
 	if err := e.Shutdown(shutdownCtx); err != nil {
 		logger.Error("graceful shutdown failed", "error", err)
 	}
+}
+
+func refreshLiveData(ctx context.Context, logger *slog.Logger, dataStore *store.Store) {
+	ticker := time.NewTicker(2 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			syncLiveData(ctx, logger, dataStore)
+		}
+	}
+}
+
+func syncLiveData(ctx context.Context, logger *slog.Logger, dataStore *store.Store) {
+	locked, release, err := dataStore.TryLiveSyncLease(ctx)
+	if err != nil {
+		logger.Warn("live sync lease failed", "error", err)
+		return
+	}
+	if !locked {
+		return
+	}
+	defer release()
+	gameweek, needed, err := dataStore.LiveSyncTarget(ctx)
+	if err != nil || !needed {
+		if err != nil {
+			logger.Warn("live sync target failed", "error", err)
+		}
+		return
+	}
+	data, err := football.NewClient().FetchLive(ctx, gameweek)
+	if err != nil {
+		logger.Warn("live gameweek sync skipped", "gameweek", gameweek, "error", err)
+		return
+	}
+	if err = dataStore.SyncLiveData(ctx, data); err != nil {
+		logger.Warn("live gameweek sync failed", "gameweek", gameweek, "error", err)
+		return
+	}
+	logger.Info("live gameweek synchronized", "gameweek", gameweek, "players", len(data.Players), "fixtures", len(data.Fixtures))
 }
 
 func refreshFootballData(ctx context.Context, logger *slog.Logger, dataStore *store.Store) {

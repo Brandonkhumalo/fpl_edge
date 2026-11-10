@@ -123,6 +123,16 @@ func (s *Store) PrepareSquad(ctx context.Context, userID uuid.UUID) error {
 	if next == nil || *next <= gw {
 		return nil
 	}
+	if _, err = tx.Exec(ctx, `INSERT INTO gameweek_squad_selections(squad_id,gameweek,squad_revision,state)
+		SELECT u.id,u.current_gameweek,u.revision,jsonb_build_object(
+			'captainId',u.captain_id,'viceCaptainId',u.vice_captain_id,
+			'starters',COALESCE((SELECT jsonb_agg(sp.player_id ORDER BY sp.player_id) FROM squad_players sp WHERE sp.squad_id=u.id AND sp.is_starter),'[]'::jsonb),
+			'bench',COALESCE((SELECT jsonb_agg(sp.player_id ORDER BY sp.bench_order) FROM squad_players sp WHERE sp.squad_id=u.id AND NOT sp.is_starter),'[]'::jsonb),
+			'players',COALESCE((SELECT jsonb_agg(sp.player_id ORDER BY sp.player_id) FROM squad_players sp WHERE sp.squad_id=u.id),'[]'::jsonb))
+		FROM user_squads u WHERE u.id=$1
+		ON CONFLICT(squad_id,gameweek) DO NOTHING`, id); err != nil {
+		return err
+	}
 	var backup []byte
 	err = tx.QueryRow(ctx, `SELECT backup FROM squad_chips WHERE squad_id=$1 AND name='freehit' AND gameweek=$2`, id, gw).Scan(&backup)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {

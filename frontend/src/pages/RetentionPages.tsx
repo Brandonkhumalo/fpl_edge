@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CalendarDays, CheckCircle2, Clock3, Eye, Route, Trash2 } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api, downloadAPI } from "../lib/api";
 import type { SquadPlayer } from "../lib/squad";

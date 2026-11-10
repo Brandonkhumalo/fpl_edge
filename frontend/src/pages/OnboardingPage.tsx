@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronRight, CircleAlert, LoaderCircle, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { FootballPitch, SquadPlayerCard } from "../components/FootballPitch";
 import { api } from "../lib/api";
 import { filterPlayers, type PlayerSort } from "../lib/playerCatalogue";
@@ -90,6 +90,7 @@ export function OnboardingPage() {
         <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Build your FPL squad</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Choose 15 players, pick a legal FPL formation, and preview your starting XI and bench before saving.</p>
         <p className="mt-2 text-sm text-slate-400">Already playing FPL? After saving your squad, record the chips you used before joining in Chip Centre.</p>
+        <Link to="/my-squad/import" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-edge/30 bg-edge/5 px-4 py-2.5 text-sm font-bold text-edge">Import your public official squad instead <ChevronRight size={16} /></Link>
       </div>
       <div className="min-w-[220px] rounded-2xl border border-white/10 bg-white/[.03] p-4">
         <div className="flex items-center justify-between text-xs text-slate-400"><span>Squad progress</span><strong className="text-white">{selected.length}/15</strong></div>

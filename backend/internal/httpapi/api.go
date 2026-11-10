@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,9 +12,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/tishanyq/fpl-edge/backend/internal/advisor"
 	"github.com/tishanyq/fpl-edge/backend/internal/auth"
 	"github.com/tishanyq/fpl-edge/backend/internal/config"
 	"github.com/tishanyq/fpl-edge/backend/internal/domain"
+	"github.com/tishanyq/fpl-edge/backend/internal/football"
 	"github.com/tishanyq/fpl-edge/backend/internal/store"
 )
 
@@ -24,10 +27,14 @@ type API struct {
 	auth          *auth.Service
 	log           *slog.Logger
 	secureCookies bool
+	advisor       *advisor.Client
+	publicSquads  interface {
+		FetchOfficialSquad(context.Context, int64) (domain.OfficialSquad, error)
+	}
 }
 
 func New(cfg config.Config, dataStore *store.Store, authService *auth.Service, logger *slog.Logger) *echo.Echo {
-	api := &API{store: dataStore, auth: authService, log: logger, secureCookies: cfg.Environment == "production"}
+	api := &API{store: dataStore, auth: authService, log: logger, secureCookies: cfg.Environment == "production", advisor: advisor.New(cfg.OpenAIAPIKey, cfg.OpenAIModel), publicSquads: football.NewClient()}
 	e := echo.New()
 	e.HideBanner = true
 	e.Use(middleware.Recover(), middleware.RequestID(), middleware.Secure())
@@ -70,6 +77,11 @@ func New(cfg config.Config, dataStore *store.Store, authService *auth.Service, l
 	protected.PUT("/recommendations/:id/outcome", api.setRecommendationOutcome)
 	protected.GET("/transfer-plans", api.transferPlans)
 	protected.POST("/transfer-plans", api.generateTransferPlan)
+	protected.GET("/live", api.liveGameweek)
+	protected.POST("/advisor/ask", api.askAdvisor)
+	protected.POST("/official-squad/imports", api.previewOfficialSquad)
+	protected.POST("/official-squad/imports/:id/apply", api.applyOfficialSquad)
+	protected.GET("/official-squad", api.officialSquadLink)
 	if cfg.StaticDir != "" {
 		e.GET("/*", spaHandler(cfg.StaticDir))
 	}

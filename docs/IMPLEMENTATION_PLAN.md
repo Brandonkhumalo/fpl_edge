@@ -53,7 +53,8 @@ For the current implementation audit and its limits, see [ADVISORY_STATUS.md](AD
 
 ## Phase 6 - Product hardening
 
-- [ ] AI advisor grounded only in engine outputs
+- [x] Grounded advisor with immutable evidence citations, audited questions and optional structured OpenAI evidence ranking
+- [x] Provisional Live Gameweek squad points, bonus/defensive progress, estimated autosubs and final-state labelling
 - [x] In-app deadline notifications, calendar reminders and player watchlists/change events
 - [ ] Email/web-push delivery adapters and product analytics
 - [ ] Full Vitest/RTL and Playwright workflow

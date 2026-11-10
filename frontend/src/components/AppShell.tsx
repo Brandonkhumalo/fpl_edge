@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Bell, Bookmark, Crown, ShieldCheck, Search, Settings, History, LayoutDashboard, LogOut, Menu, Route, Users, X } from "lucide-react";
+import { Activity, ArrowRightLeft, Bell, Bookmark, Bot, Crown, Download, ShieldCheck, Search, Settings, History, LayoutDashboard, LogOut, Menu, Route, Users, X } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -6,9 +6,11 @@ import { useAuth } from "../lib/auth";
 
 const nav = [
   ["Dashboard", "/dashboard", LayoutDashboard], ["Weekly advisor", "/advice", Crown], ["My squad", "/my-squad", Users],
+  ["Import official squad", "/my-squad/import", Download],
   ["Captain & VC", "/captaincy", Crown], ["Transfers", "/transfers", ArrowRightLeft], ["Chip centre", "/chips", ShieldCheck],
   ["Player scout", "/scout", Search], ["Watchlist", "/watchlist", Bookmark], ["Deadline centre", "/deadline", Bell],
-  ["Transfer planner", "/planner", Route], ["Outcomes", "/recommendations", History], ["Team history", "/my-squad/history", History], ["Settings", "/settings", Settings]
+  ["Transfer planner", "/planner", Route], ["Live Gameweek", "/live", Activity], ["Grounded advisor", "/advisor", Bot],
+  ["Outcomes", "/recommendations", History], ["Team history", "/my-squad/history", History], ["Settings", "/settings", Settings]
 ] as const;
 
 export function AppShell() {

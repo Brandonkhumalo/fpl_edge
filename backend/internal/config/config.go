@@ -16,6 +16,8 @@ type Config struct {
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
 	CORSOrigins     []string
+	OpenAIAPIKey    string
+	OpenAIModel     string
 }
 
 func Load() (Config, error) {
@@ -37,6 +39,8 @@ func Load() (Config, error) {
 		AccessTokenTTL:  accessTTL,
 		RefreshTokenTTL: refreshTTL,
 		CORSOrigins:     split(value("CORS_ORIGINS", "http://localhost:5173")),
+		OpenAIAPIKey:    strings.TrimSpace(os.Getenv("OPENAI_API_KEY")),
+		OpenAIModel:     value("OPENAI_MODEL", "gpt-6-astra"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
